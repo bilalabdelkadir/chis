@@ -37,10 +37,11 @@ func main() {
 	// Repositories
 	userRepo := repository.NewUserRepository(pool)
 	accountRepo := repository.NewAccountRepository(pool)
+	orgRepo := repository.NewOrganizationRepository(pool)
+	membershipRepo := repository.NewMembershipRepository(pool)
 
 	// Handlers
-	authHandler := handler.NewAuthHandler(userRepo, accountRepo, cfg.JwtSecret)
-
+	authHandler := handler.NewAuthHandler(userRepo, accountRepo, orgRepo, membershipRepo, cfg.JwtSecret)
 	// Router
 	r := router.NewRouter()
 	r.Use(middleware.Logging)

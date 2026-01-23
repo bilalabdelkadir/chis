@@ -8,14 +8,17 @@ import (
 	"github.com/bilalabdelkadir/chis/internal/repository"
 	"github.com/bilalabdelkadir/chis/pkg/apperror"
 	"github.com/bilalabdelkadir/chis/pkg/response"
+	"github.com/bilalabdelkadir/chis/pkg/slugify"
 	"github.com/bilalabdelkadir/chis/pkg/validator"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthHandler struct {
-	userRepo    *repository.UserRepository
-	accountRepo *repository.AccountRepository
-	jwtSecret   string
+	userRepo         *repository.UserRepository
+	accountRepo      *repository.AccountRepository
+	jwtSecret        string
+	organizationRepo *repository.OrganizationRepository
+	membershipRepo   *repository.MembershipRepository
 }
 
 type RegisterRequest struct {
@@ -40,11 +43,19 @@ type LoginResponse struct {
 	Token string `json:"token"`
 }
 
-func NewAuthHandler(userRepo *repository.UserRepository, accountRepo *repository.AccountRepository, jwtSecret string) *AuthHandler {
+func NewAuthHandler(
+	userRepo *repository.UserRepository,
+	accountRepo *repository.AccountRepository,
+	organizationRepo *repository.OrganizationRepository,
+	membershipRepo *repository.MembershipRepository,
+	jwtSecret string,
+) *AuthHandler {
 	return &AuthHandler{
-		userRepo:    userRepo,
-		accountRepo: accountRepo,
-		jwtSecret:   jwtSecret,
+		userRepo:         userRepo,
+		accountRepo:      accountRepo,
+		organizationRepo: organizationRepo,
+		membershipRepo:   membershipRepo,
+		jwtSecret:        jwtSecret,
 	}
 }
 
@@ -119,6 +130,28 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if err := h.accountRepo.Create(r.Context(), account); err != nil {
+		return err
+	}
+
+	orgName := user.FirstName + "'s Workspace"
+	slug := slugify.Slugify(orgName)
+
+	org := &model.Organization{
+		Name: orgName,
+		Slug: slug,
+	}
+
+	if err := h.organizationRepo.Create(r.Context(), org); err != nil {
+		return err
+	}
+
+	membership := &model.Membership{
+		UserID: user.ID,
+		OrgID:  org.ID,
+		Role:   "admin",
+	}
+
+	if err := h.membershipRepo.Create(r.Context(), membership); err != nil {
 		return err
 	}
 
