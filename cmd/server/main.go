@@ -40,16 +40,19 @@ func main() {
 	orgRepo := repository.NewOrganizationRepository(pool)
 	membershipRepo := repository.NewMembershipRepository(pool)
 	apiKeyRepo := repository.NewApiKeyRepository(pool)
+	messageRepo := repository.NewMessageRepository(pool)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(userRepo, accountRepo, orgRepo, membershipRepo, cfg.JwtSecret)
 	apiKeyHandler := handler.NewApiKeyHandler(membershipRepo, apiKeyRepo)
+	webhookHandler := handler.NewWebhookHandler(messageRepo)
+
 	// Router
 	r := router.NewRouter()
 	r.Use(middleware.Logging)
 	r.Get("/health", healthHandler)
 
-	router.Setup(r, authHandler, apiKeyHandler, apiKeyRepo, cfg.JwtSecret)
+	router.Setup(r, authHandler, apiKeyHandler, webhookHandler, apiKeyRepo, cfg.JwtSecret)
 
 	fmt.Println("server starting on port", cfg.Port)
 	log.Fatal(http.ListenAndServe(":"+cfg.Port, r))

@@ -1,26 +1,15 @@
 package router
 
 import (
-	"net/http"
-
 	"github.com/bilalabdelkadir/chis/internal/handler"
 	"github.com/bilalabdelkadir/chis/internal/middleware"
 	"github.com/bilalabdelkadir/chis/internal/repository"
-	"github.com/bilalabdelkadir/chis/pkg/response"
 )
-
-func webhookTestHandler(w http.ResponseWriter, r *http.Request) error {
-	orgId := r.Context().Value(middleware.OrgIDKey)
-	response.WriteJSON(w, http.StatusOK, map[string]interface{}{
-		"message": "API key valid",
-		"orgId":   orgId,
-	})
-	return nil
-}
 
 func Setup(r *Router,
 	authHandler *handler.AuthHandler,
 	apiKeyHandler *handler.ApiKeyHandler,
+	webhookHandler *handler.WebhookHandler,
 	apiKeyRepo *repository.ApiKeyRepository,
 	secret string,
 ) {
@@ -32,7 +21,7 @@ func Setup(r *Router,
 
 	r.Route("/webhook", func(r *Router) {
 		r.Use(middleware.ValidateApiKey(apiKeyRepo))
-		r.Get("/test", webhookTestHandler)
+		r.Post("/send", webhookHandler.Send)
 	})
 
 	r.Route("/api", func(r *Router) {
