@@ -1,5 +1,3 @@
-# Variables
-DB_URL=postgresql://admin:2334@localhost:5432/chis?sslmode=disable
 
 # Run the server
 run:

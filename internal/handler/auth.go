@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"github.com/bilalabdelkadir/chis/internal/auth"
 	"github.com/bilalabdelkadir/chis/internal/model"
 	"github.com/bilalabdelkadir/chis/internal/repository"
 	"github.com/bilalabdelkadir/chis/pkg/apperror"
@@ -14,6 +15,7 @@ import (
 type AuthHandler struct {
 	userRepo    *repository.UserRepository
 	accountRepo *repository.AccountRepository
+	jwtSecret   string
 }
 
 type RegisterRequest struct {
@@ -29,11 +31,61 @@ type RegisterResponse struct {
 	FirstName string `json:"firstName"`
 }
 
-func NewAuthHandler(userRepo *repository.UserRepository, accountRepo *repository.AccountRepository) *AuthHandler {
+type LoginRequest struct {
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=8"`
+}
+
+type LoginResponse struct {
+	Token string `json:"token"`
+}
+
+func NewAuthHandler(userRepo *repository.UserRepository, accountRepo *repository.AccountRepository, jwtSecret string) *AuthHandler {
 	return &AuthHandler{
 		userRepo:    userRepo,
 		accountRepo: accountRepo,
+		jwtSecret:   jwtSecret,
 	}
+}
+
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) error {
+	var req LoginRequest
+
+	if err := validator.DecodeAndValidate(r, &req); err != nil {
+		return err
+	}
+
+	userExists, err := h.userRepo.FindByEmail(r.Context(), req.Email)
+	if err != nil {
+		return apperror.Unauthorized("Email or password invalid.")
+	}
+
+	accountExists, err := h.accountRepo.FindByUserID(r.Context(), userExists.ID)
+	if err != nil {
+		return apperror.Unauthorized("Email or password invalid.")
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(*accountExists.PasswordHash), []byte(req.Password))
+
+	if err != nil {
+		return apperror.Unauthorized("Email or password invalid.")
+	}
+
+	token, err := auth.GenerateToken(userExists.ID,
+		h.jwtSecret,
+	)
+
+	if err != nil {
+		return apperror.BadRequest("something error occurred please try again.")
+	}
+
+	res := LoginResponse{
+		Token: token,
+	}
+
+	response.WriteJSON(w, http.StatusAccepted, res)
+
+	return nil
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) error {

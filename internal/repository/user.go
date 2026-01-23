@@ -33,6 +33,7 @@ func (r *UserRepository) Create(ctx context.Context, user *model.User) error {
 
 	return err
 }
+
 func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*model.User, error) {
 	var u model.User
 
