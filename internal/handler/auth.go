@@ -7,8 +7,8 @@ import (
 	"github.com/bilalabdelkadir/chis/internal/model"
 	"github.com/bilalabdelkadir/chis/internal/repository"
 	"github.com/bilalabdelkadir/chis/pkg/apperror"
+	"github.com/bilalabdelkadir/chis/pkg/helper"
 	"github.com/bilalabdelkadir/chis/pkg/response"
-	"github.com/bilalabdelkadir/chis/pkg/slugify"
 	"github.com/bilalabdelkadir/chis/pkg/validator"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -134,7 +134,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	orgName := user.FirstName + "'s Workspace"
-	slug := slugify.Slugify(orgName)
+	slug := helper.Slugify(orgName)
 
 	org := &model.Organization{
 		Name: orgName,

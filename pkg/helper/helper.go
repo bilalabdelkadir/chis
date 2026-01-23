@@ -1,6 +1,10 @@
-package slugify
+package helper
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"regexp"
 	"strings"
 )
@@ -25,4 +29,19 @@ func Slugify(s string) string {
 	s = strings.Trim(s, "-")
 
 	return s
+}
+
+func GenerateRandomApiKey(prefix string) (string, error) {
+	randomBytes := make([]byte, 32)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", fmt.Errorf("couldn't generate api key: %w", err)
+	}
+	randomString := hex.EncodeToString(randomBytes)
+	return prefix + randomString, nil
+}
+
+func HashSHA256(value string) string {
+	hash := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(hash[:])
 }
