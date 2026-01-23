@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"github.com/bilalabdelkadir/chis/internal/middleware"
 	"github.com/bilalabdelkadir/chis/internal/repository"
 	"github.com/bilalabdelkadir/chis/internal/router"
+	"github.com/bilalabdelkadir/chis/internal/worker"
 )
 
 func healthHandler(w http.ResponseWriter, r *http.Request) error {
@@ -41,6 +43,7 @@ func main() {
 	membershipRepo := repository.NewMembershipRepository(pool)
 	apiKeyRepo := repository.NewApiKeyRepository(pool)
 	messageRepo := repository.NewMessageRepository(pool)
+	attemptRepo := repository.NewDeliveryAttemptsRepository(pool)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(userRepo, accountRepo, orgRepo, membershipRepo, cfg.JwtSecret)
@@ -54,6 +57,11 @@ func main() {
 
 	router.Setup(r, authHandler, apiKeyHandler, webhookHandler, apiKeyRepo, cfg.JwtSecret)
 
+	// Worker
+	w := worker.NewWorker(messageRepo, attemptRepo)
+	go w.Start(context.Background())
+
+	fmt.Println("worker started")
 	fmt.Println("server starting on port", cfg.Port)
 	log.Fatal(http.ListenAndServe(":"+cfg.Port, r))
 }
