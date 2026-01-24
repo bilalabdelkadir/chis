@@ -6,6 +6,9 @@ run-api:
 run-worker:
 	go run cmd/worker/main.go
 
+run-scheduler:
+	go run cmd/scheduler/main.go
+
 run-grpc:
 	go run cmd/delivery/main.go
 # Database migrations

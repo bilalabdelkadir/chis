@@ -20,14 +20,16 @@ type APIKey struct {
 }
 
 type Message struct {
-	ID        uuid.UUID       `json:"id"`
-	OrgID     uuid.UUID       `json:"orgId"`
-	Method    string          `json:"method"` // e.g., "POST"
-	URL       string          `json:"url"`
-	Payload   json.RawMessage `json:"payload"` // JSONB stored as []byte
-	Status    string          `json:"status"`  // 'pending', 'success', 'failed'
-	CreatedAt time.Time       `json:"createdAt"`
-	UpdatedAt time.Time       `json:"updatedAt"`
+	ID           uuid.UUID       `json:"id"`
+	OrgID        uuid.UUID       `json:"orgId"`
+	Method       string          `json:"method"` // e.g., "POST"
+	URL          string          `json:"url"`
+	Payload      json.RawMessage `json:"payload"` // JSONB stored as []byte
+	Status       string          `json:"status"`  // 'pending', 'success', 'failed'
+	CreatedAt    time.Time       `json:"createdAt"`
+	UpdatedAt    time.Time       `json:"updatedAt"`
+	AttemptCount int             `json:"attemptCount"`
+	NextRetryAt  *time.Time      `json:"nextRetryAt"`
 }
 
 type DeliveryAttempt struct {

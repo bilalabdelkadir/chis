@@ -14,10 +14,16 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	MaxAttempts = 5
+	BaseBackoff = 1 * time.Second
+)
+
 type Worker struct {
 	messageRepo repository.MessageRepository
 	attemptRepo repository.DeliveryAttemptRepository
 	queue       *queue.Queue
+	httpClient  *http.Client
 }
 
 func NewWorker(messageRepo repository.MessageRepository, attemptRepo repository.DeliveryAttemptRepository,
@@ -27,6 +33,9 @@ func NewWorker(messageRepo repository.MessageRepository, attemptRepo repository.
 		messageRepo: messageRepo,
 		attemptRepo: attemptRepo,
 		queue:       queue,
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+		},
 	}
 }
 
@@ -70,11 +79,10 @@ func (w *Worker) deliver(ctx context.Context, msg *model.Message) {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
 	log.Printf("[Worker] Delivering message %s to %s", msg.ID, msg.URL)
 
 	start := time.Now()
-	resp, err := client.Do(req)
+	resp, err := w.httpClient.Do(req)
 	duration := time.Since(start)
 
 	var (
@@ -89,8 +97,8 @@ func (w *Worker) deliver(ctx context.Context, msg *model.Message) {
 	durationMS = &ms
 
 	if err != nil {
-		msg := err.Error()
-		errorMessage = &msg
+		errMsg := err.Error()
+		errorMessage = &errMsg
 		success = false
 	} else {
 		defer resp.Body.Close()
@@ -109,7 +117,7 @@ func (w *Worker) deliver(ctx context.Context, msg *model.Message) {
 
 	attempt := &model.DeliveryAttempt{
 		MessageID:     msg.ID,
-		AttemptNumber: 1,
+		AttemptNumber: msg.AttemptCount + 1,
 		StatusCode:    statusCode,
 		ErrorMessage:  errorMessage,
 		DurationMS:    durationMS,
@@ -120,11 +128,27 @@ func (w *Worker) deliver(ctx context.Context, msg *model.Message) {
 
 	if success {
 		log.Printf("[Worker] Success: %s (status=%d, duration=%dms)", msg.ID, *statusCode, *durationMS)
-
 		_, err = w.messageRepo.UpdateStatus(ctx, msg.ID, "success")
 	} else {
-		log.Printf("[Worker] Failed: %s (error=%s)", msg.ID, *errorMessage)
+		if errorMessage != nil {
+			log.Printf("[Worker] Failed: %s (error=%s)", msg.ID, *errorMessage)
+		} else {
+			log.Printf("[Worker] Failed: %s (status=%d)", msg.ID, *statusCode)
+		}
+		if msg.AttemptCount < MaxAttempts {
+			backoff := BaseBackoff * time.Duration(1<<msg.AttemptCount) // 1<<n is 2^n
+			nextRetry := time.Now().Add(backoff)
+			updatedData := &model.Message{
+				ID:           msg.ID,
+				AttemptCount: msg.AttemptCount + 1,
+				NextRetryAt:  &nextRetry,
+				Status:       "retry",
+			}
+			err = w.messageRepo.Update(ctx, updatedData)
 
-		_, err = w.messageRepo.UpdateStatus(ctx, msg.ID, "failed")
+		} else {
+			msg.Status = "failed"
+			err = w.messageRepo.Update(ctx, msg)
+		}
 	}
 }

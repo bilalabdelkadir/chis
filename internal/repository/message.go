@@ -106,7 +106,7 @@ func (r *PostgresMessageRepository) FindById(ctx context.Context, id uuid.UUID) 
 	var msg model.Message
 
 	err := r.pool.QueryRow(ctx, `
-		SELECT id, org_id, method, url, payload, status, created_at, updated_at
+		SELECT id, org_id, method, url, payload, status, created_at, updated_at, attempt_count, next_retry_at
 		FROM messages
 		WHERE id = $1
 	`, id).Scan(
@@ -118,6 +118,8 @@ func (r *PostgresMessageRepository) FindById(ctx context.Context, id uuid.UUID) 
 		&msg.Status,
 		&msg.CreatedAt,
 		&msg.UpdatedAt,
+		&msg.AttemptCount,
+		&msg.NextRetryAt,
 	)
 
 	if err != nil {
@@ -128,4 +130,55 @@ func (r *PostgresMessageRepository) FindById(ctx context.Context, id uuid.UUID) 
 	}
 
 	return &msg, nil
+}
+
+func (r *PostgresMessageRepository) Update(ctx context.Context, msg *model.Message) error {
+	_, err := r.pool.Exec(ctx, `
+        UPDATE messages 
+        SET status = $1, attempt_count = $2, next_retry_at = $3
+        WHERE id = $4
+    `, msg.Status, msg.AttemptCount, msg.NextRetryAt, msg.ID)
+	return err
+}
+
+func (r *PostgresMessageRepository) FindRetryReady(ctx context.Context, limit int) ([]*model.Message, error) {
+
+	rows, err := r.pool.Query(ctx, `
+        SELECT id, org_id, method, url, payload, status,
+               created_at, updated_at, attempt_count, next_retry_at
+        FROM messages
+        WHERE status = 'retry'
+          AND next_retry_at IS NOT NULL
+          AND next_retry_at <= NOW()
+        ORDER BY next_retry_at ASC
+        LIMIT $1
+    `, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var messages []*model.Message
+
+	for rows.Next() {
+		msg := &model.Message{}
+		err := rows.Scan(
+			&msg.ID,
+			&msg.OrgID,
+			&msg.Method,
+			&msg.URL,
+			&msg.Payload,
+			&msg.Status,
+			&msg.CreatedAt,
+			&msg.UpdatedAt,
+			&msg.AttemptCount,
+			&msg.NextRetryAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, msg)
+	}
+
+	return messages, rows.Err()
 }
