@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/bilalabdelkadir/chis/internal/metrics"
 	"github.com/bilalabdelkadir/chis/internal/model"
 	"github.com/bilalabdelkadir/chis/internal/queue"
 	"github.com/bilalabdelkadir/chis/internal/repository"
@@ -129,6 +130,8 @@ func (w *Worker) deliver(ctx context.Context, msg *model.Message) {
 	if success {
 		slog.Info("webhook_delivered", "message_id", msg.ID, "org_id", msg.OrgID, "status_code", *statusCode, "duration_ms", *durationMS)
 		_, err = w.messageRepo.UpdateStatus(ctx, msg.ID, "success")
+		metrics.WebhooksDeliveredTotal.WithLabelValues("success").Inc()
+		metrics.WebhookDeliveryDuration.Observe(float64(ms))
 	} else {
 		if errorMessage != nil {
 			slog.Warn("webhook_failed", "message_id", msg.ID, "org_id", msg.OrgID, "error", *errorMessage)
@@ -145,10 +148,13 @@ func (w *Worker) deliver(ctx context.Context, msg *model.Message) {
 				Status:       "retry",
 			}
 			err = w.messageRepo.Update(ctx, updatedData)
-
+			metrics.WebhooksDeliveredTotal.WithLabelValues("failed").Inc()
+			metrics.WebhookDeliveryDuration.Observe(float64(ms))
 		} else {
 			msg.Status = "failed"
 			err = w.messageRepo.Update(ctx, msg)
+			metrics.WebhooksDeliveredTotal.WithLabelValues("dead_letter").Inc()
+			metrics.WebhookDeliveryDuration.Observe(float64(ms))
 		}
 	}
 }

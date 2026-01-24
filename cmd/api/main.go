@@ -14,6 +14,7 @@ import (
 	"github.com/bilalabdelkadir/chis/internal/repository"
 	"github.com/bilalabdelkadir/chis/internal/router"
 	pb "github.com/bilalabdelkadir/chis/proto/delivery"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -65,6 +66,12 @@ func main() {
 	r := router.NewRouter()
 	r.Use(middleware.Logging)
 	r.Get("/health", healthHandler)
+	go func() {
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
+		slog.Info("metrics_server_started", "port", 9090)
+		http.ListenAndServe(":9090", mux)
+	}()
 
 	router.Setup(r, authHandler, apiKeyHandler, webhookHandler, apiKeyRepo, cfg.JwtSecret)
 

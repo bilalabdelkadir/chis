@@ -3,7 +3,10 @@ package middleware
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
+
+	"github.com/bilalabdelkadir/chis/internal/metrics"
 )
 
 type responseWriter struct {
@@ -28,5 +31,9 @@ func Logging(next http.Handler) http.Handler {
 			"status", rw.status,
 			"duration_ms", duration.Milliseconds(),
 		)
+
+		metrics.HttpRequestsTotal.WithLabelValues(r.Method, r.URL.Path, strconv.Itoa(rw.status)).Inc()
+		metrics.HttpRequestDuration.WithLabelValues(r.Method, r.URL.Path).Observe(float64(duration))
+
 	})
 }
