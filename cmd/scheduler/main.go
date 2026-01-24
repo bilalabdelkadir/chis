@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"net/http"
 	"os"
 
 	"github.com/bilalabdelkadir/chis/internal/config"
@@ -14,6 +16,11 @@ import (
 )
 
 var QueueName = "main"
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
 
 func main() {
 	logger.Setup()
@@ -45,6 +52,14 @@ func main() {
 	queue := queue.NewQueue(rdsClient, QueueName)
 
 	slog.Info("scheduler_started")
+
+	go func() {
+		http.HandleFunc("/health", healthHandler)
+		slog.Info("health_server_started", "port", 8084)
+		if err := http.ListenAndServe(":8084", nil); err != nil {
+			slog.Error("health_server_failed", "error", err)
+		}
+	}()
 
 	w := scheduler.NewScheduler(messageRepo, queue)
 	w.Start(context.Background())

@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 
 	"github.com/bilalabdelkadir/chis/internal/config"
@@ -17,6 +19,11 @@ import (
 )
 
 var QueueName = "main"
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
 
 func main() {
 	logger.Setup()
@@ -56,6 +63,14 @@ func main() {
 	}
 
 	slog.Info("delivery_service_starting", "port", 50051)
+
+	go func() {
+		http.HandleFunc("/health", healthHandler)
+		slog.Info("health_server_started", "port", 8082)
+		if err := http.ListenAndServe(":8082", nil); err != nil {
+			slog.Error("health_server_failed", "error", err)
+		}
+	}()
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterDeliveryServiceServer(grpcServer, deliveryService)
