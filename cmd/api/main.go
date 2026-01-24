@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,9 +10,11 @@ import (
 	"github.com/bilalabdelkadir/chis/internal/database"
 	"github.com/bilalabdelkadir/chis/internal/handler"
 	"github.com/bilalabdelkadir/chis/internal/middleware"
-	"github.com/bilalabdelkadir/chis/internal/queue"
 	"github.com/bilalabdelkadir/chis/internal/repository"
 	"github.com/bilalabdelkadir/chis/internal/router"
+	pb "github.com/bilalabdelkadir/chis/proto/delivery"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func healthHandler(w http.ResponseWriter, r *http.Request) error {
@@ -21,8 +22,6 @@ func healthHandler(w http.ResponseWriter, r *http.Request) error {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	return nil
 }
-
-var QueueName = "main"
 
 func main() {
 	cfg, err := config.LoadEnv()
@@ -44,22 +43,20 @@ func main() {
 	orgRepo := repository.NewOrganizationRepository(pool)
 	membershipRepo := repository.NewMembershipRepository(pool)
 	apiKeyRepo := repository.NewApiKeyRepository(pool)
-	messageRepo := repository.NewMessageRepository(pool)
 
-	ctx := context.Background()
-
-	rdsClient, err := queue.NewRedisClient(ctx, cfg.RedisUrl)
 	if err != nil {
 		log.Fatal(err)
 	}
-	queue := queue.NewQueue(rdsClient, QueueName)
 
 	fmt.Println("database connected.")
+	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	deliveryClient := pb.NewDeliveryServiceClient(conn)
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(userRepo, accountRepo, orgRepo, membershipRepo, cfg.JwtSecret)
 	apiKeyHandler := handler.NewApiKeyHandler(membershipRepo, apiKeyRepo)
-	webhookHandler := handler.NewWebhookHandler(messageRepo, queue)
+	webhookHandler := handler.NewWebhookHandler(deliveryClient)
 
 	// Router
 	r := router.NewRouter()
