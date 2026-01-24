@@ -14,7 +14,7 @@ import (
 )
 
 type WebhookHandler struct {
-	messageRepo *repository.MessageRepository
+	messageRepo repository.MessageRepository
 }
 
 type SendWebhookRequest struct {
@@ -29,7 +29,7 @@ type SendWebhookResponse struct {
 }
 
 func NewWebhookHandler(
-	messageRepo *repository.MessageRepository,
+	messageRepo repository.MessageRepository,
 ) *WebhookHandler {
 	return &WebhookHandler{
 		messageRepo: messageRepo,

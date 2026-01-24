@@ -12,11 +12,11 @@ import (
 )
 
 type Worker struct {
-	messageRepo *repository.MessageRepository
-	attemptRepo *repository.DeliveryAttemptsRepository
+	messageRepo repository.MessageRepository
+	attemptRepo repository.DeliveryAttemptRepository
 }
 
-func NewWorker(messageRepo *repository.MessageRepository, attemptRepo *repository.DeliveryAttemptsRepository) *Worker {
+func NewWorker(messageRepo repository.MessageRepository, attemptRepo repository.DeliveryAttemptRepository) *Worker {
 	return &Worker{
 		messageRepo: messageRepo,
 		attemptRepo: attemptRepo,
@@ -96,7 +96,7 @@ func (w *Worker) deliver(ctx context.Context, msg *model.Message) {
 
 	attempt := &model.DeliveryAttempt{
 		MessageID:     msg.ID,
-		AttemptNumber: 1, // keep simple for now
+		AttemptNumber: 1,
 		StatusCode:    statusCode,
 		ErrorMessage:  errorMessage,
 		DurationMS:    durationMS,

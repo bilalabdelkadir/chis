@@ -8,17 +8,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type UserRepository struct {
+type PostgresUserRepository struct {
 	pool *pgxpool.Pool
 }
 
-func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
-	return &UserRepository{
+func NewUserRepository(pool *pgxpool.Pool) UserRepository {
+	return &PostgresUserRepository{
 		pool: pool,
 	}
 }
 
-func (r *UserRepository) Create(ctx context.Context, user *model.User) error {
+func (r *PostgresUserRepository) Create(ctx context.Context, user *model.User) error {
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO users (email, first_name, last_name, email_verified)
 		VALUES ($1, $2,$3,$4)
@@ -34,7 +34,7 @@ func (r *UserRepository) Create(ctx context.Context, user *model.User) error {
 	return err
 }
 
-func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*model.User, error) {
+func (r *PostgresUserRepository) FindByEmail(ctx context.Context, email string) (*model.User, error) {
 	var u model.User
 
 	err := r.pool.QueryRow(ctx, `

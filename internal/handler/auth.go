@@ -14,11 +14,11 @@ import (
 )
 
 type AuthHandler struct {
-	userRepo         *repository.UserRepository
-	accountRepo      *repository.AccountRepository
+	userRepo         repository.UserRepository
+	accountRepo      repository.AccountRepository
 	jwtSecret        string
-	organizationRepo *repository.OrganizationRepository
-	membershipRepo   *repository.MembershipRepository
+	organizationRepo repository.OrganizationRepository
+	membershipRepo   repository.MembershipRepository
 }
 
 type RegisterRequest struct {
@@ -44,10 +44,10 @@ type LoginResponse struct {
 }
 
 func NewAuthHandler(
-	userRepo *repository.UserRepository,
-	accountRepo *repository.AccountRepository,
-	organizationRepo *repository.OrganizationRepository,
-	membershipRepo *repository.MembershipRepository,
+	userRepo repository.UserRepository,
+	accountRepo repository.AccountRepository,
+	organizationRepo repository.OrganizationRepository,
+	membershipRepo repository.MembershipRepository,
 	jwtSecret string,
 ) *AuthHandler {
 	return &AuthHandler{

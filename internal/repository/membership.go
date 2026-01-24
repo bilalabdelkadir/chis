@@ -8,17 +8,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type MembershipRepository struct {
+type PostgresMembershipRepository struct {
 	pool *pgxpool.Pool
 }
 
-func NewMembershipRepository(pool *pgxpool.Pool) *MembershipRepository {
-	return &MembershipRepository{
+func NewMembershipRepository(pool *pgxpool.Pool) MembershipRepository {
+	return &PostgresMembershipRepository{
 		pool: pool,
 	}
 }
 
-func (r *MembershipRepository) Create(ctx context.Context, membership *model.Membership) error {
+func (r *PostgresMembershipRepository) Create(ctx context.Context, membership *model.Membership) error {
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO memberships (user_id, org_id, role)
 		VALUES ($1,$2,$3)
@@ -33,7 +33,7 @@ func (r *MembershipRepository) Create(ctx context.Context, membership *model.Mem
 	return err
 }
 
-func (r *MembershipRepository) FindByUserID(ctx context.Context, userID uuid.UUID) (*model.Membership, error) {
+func (r *PostgresMembershipRepository) FindByUserID(ctx context.Context, userID uuid.UUID) (*model.Membership, error) {
 	m := &model.Membership{}
 
 	err := r.pool.QueryRow(ctx, `

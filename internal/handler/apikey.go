@@ -15,13 +15,13 @@ import (
 )
 
 type ApiKeyHandler struct {
-	membershipRepo *repository.MembershipRepository
-	apiKeyRepo     *repository.ApiKeyRepository
+	membershipRepo repository.MembershipRepository
+	apiKeyRepo     repository.ApiKeyRepository
 }
 
 func NewApiKeyHandler(
-	membershipRepo *repository.MembershipRepository,
-	apiKeyRepo *repository.ApiKeyRepository,
+	membershipRepo repository.MembershipRepository,
+	apiKeyRepo repository.ApiKeyRepository,
 
 ) *ApiKeyHandler {
 	return &ApiKeyHandler{

@@ -7,17 +7,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type ApiKeyRepository struct {
+type PostgresApiKeyRepository struct {
 	pool *pgxpool.Pool
 }
 
-func NewApiKeyRepository(pool *pgxpool.Pool) *ApiKeyRepository {
-	return &ApiKeyRepository{
+func NewApiKeyRepository(pool *pgxpool.Pool) ApiKeyRepository {
+	return &PostgresApiKeyRepository{
 		pool: pool,
 	}
 }
 
-func (r *ApiKeyRepository) Create(ctx context.Context, apiKey *model.APIKey) error {
+func (r *PostgresApiKeyRepository) Create(ctx context.Context, apiKey *model.APIKey) error {
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO api_keys (org_id, name,prefix, hashed_key, expires_at)
 		VALUES ($1,$2,$3,$4,$5)
@@ -34,7 +34,7 @@ func (r *ApiKeyRepository) Create(ctx context.Context, apiKey *model.APIKey) err
 	return err
 }
 
-func (r *ApiKeyRepository) FindByHashedKey(ctx context.Context, hashedKey string) (*model.APIKey, error) {
+func (r *PostgresApiKeyRepository) FindByHashedKey(ctx context.Context, hashedKey string) (*model.APIKey, error) {
 	apiKey := &model.APIKey{}
 
 	err := r.pool.QueryRow(ctx, `

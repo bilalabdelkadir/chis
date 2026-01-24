@@ -7,17 +7,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type OrganizationRepository struct {
+type PostgresOrganizationRepository struct {
 	pool *pgxpool.Pool
 }
 
-func NewOrganizationRepository(pool *pgxpool.Pool) *OrganizationRepository {
-	return &OrganizationRepository{
+func NewOrganizationRepository(pool *pgxpool.Pool) OrganizationRepository {
+	return &PostgresOrganizationRepository{
 		pool: pool,
 	}
 }
 
-func (r *OrganizationRepository) Create(ctx context.Context, organization *model.Organization) error {
+func (r *PostgresOrganizationRepository) Create(ctx context.Context, organization *model.Organization) error {
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO organizations (name, slug)
 		VALUES ($1,$2)

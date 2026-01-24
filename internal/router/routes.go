@@ -10,7 +10,7 @@ func Setup(r *Router,
 	authHandler *handler.AuthHandler,
 	apiKeyHandler *handler.ApiKeyHandler,
 	webhookHandler *handler.WebhookHandler,
-	apiKeyRepo *repository.ApiKeyRepository,
+	apiKeyRepo repository.ApiKeyRepository,
 	secret string,
 ) {
 	// Public routes - no auth required

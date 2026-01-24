@@ -8,17 +8,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type MessageRepository struct {
+type PostgresMessageRepository struct {
 	pool *pgxpool.Pool
 }
 
-func NewMessageRepository(pool *pgxpool.Pool) *MessageRepository {
-	return &MessageRepository{
+func NewMessageRepository(pool *pgxpool.Pool) MessageRepository {
+	return &PostgresMessageRepository{
 		pool: pool,
 	}
 }
 
-func (r *MessageRepository) Create(ctx context.Context, message *model.Message) error {
+func (r *PostgresMessageRepository) Create(ctx context.Context, message *model.Message) error {
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO messages (org_id, method, url,payload)
 		VALUES ($1,$2,$3,$4)
@@ -34,7 +34,7 @@ func (r *MessageRepository) Create(ctx context.Context, message *model.Message) 
 	return err
 }
 
-func (r *MessageRepository) FindPending(ctx context.Context, limit int) ([]*model.Message, error) {
+func (r *PostgresMessageRepository) FindPending(ctx context.Context, limit int) ([]*model.Message, error) {
 	messages := []*model.Message{}
 
 	rows, err := r.pool.Query(ctx, `
@@ -75,7 +75,7 @@ func (r *MessageRepository) FindPending(ctx context.Context, limit int) ([]*mode
 	return messages, nil
 }
 
-func (r *MessageRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string) (*model.Message, error) {
+func (r *PostgresMessageRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status string) (*model.Message, error) {
 	msg := &model.Message{}
 
 	err := r.pool.QueryRow(ctx, `

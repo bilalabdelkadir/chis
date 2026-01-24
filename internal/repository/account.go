@@ -9,18 +9,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-type AccountRepository struct {
+type PostgresAccountRepository struct {
 	pool *pgxpool.Pool
 }
 
-func NewAccountRepository(pool *pgxpool.Pool) *AccountRepository {
+func NewAccountRepository(pool *pgxpool.Pool) AccountRepository {
 
-	return &AccountRepository{
+	return &PostgresAccountRepository{
 		pool: pool,
 	}
 }
 
-func (r *AccountRepository) Create(ctx context.Context, account *model.Account) error {
+func (r *PostgresAccountRepository) Create(ctx context.Context, account *model.Account) error {
 	err := r.pool.QueryRow(ctx, `
 	INSERT INTO accounts (user_id, provider, provider_account_id, password_hash)
 	VALUES ($1, $2, $3, $4)
@@ -35,7 +35,7 @@ func (r *AccountRepository) Create(ctx context.Context, account *model.Account) 
 	return err
 }
 
-func (r *AccountRepository) FindByUserID(ctx context.Context, userID uuid.UUID) (*model.Account, error) {
+func (r *PostgresAccountRepository) FindByUserID(ctx context.Context, userID uuid.UUID) (*model.Account, error) {
 	var a model.Account
 
 	err := r.pool.QueryRow(ctx, `
