@@ -2,7 +2,7 @@ package delivery
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/bilalabdelkadir/chis/internal/model"
 	"github.com/bilalabdelkadir/chis/internal/queue"
@@ -28,8 +28,8 @@ func NewDeliveryService(messageRepo repository.MessageRepository, queue *queue.Q
 }
 
 func (s *ServiceRepo) QueueMessage(ctx context.Context, req *pb.QueueMessageRequest) (*pb.QueueMessageResponse, error) {
-	log.Printf("[Delivery] Received QueueMessage request for URL: %s", req.Url)
-	// org_id comes from req.OrgId
+	slog.Info("message_received", "url", req.Url, "method", req.Method.String())
+
 	orgId, err := uuid.Parse(req.OrgId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid org_id")
@@ -47,9 +47,10 @@ func (s *ServiceRepo) QueueMessage(ctx context.Context, req *pb.QueueMessageRequ
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to save message")
 	}
-	log.Printf("[Delivery] Saved message %s to database", message.ID)
+	slog.Info("message_saved", "message_id", message.ID, "org_id", message.OrgID)
+
 	s.queue.Push(ctx, message.ID.String())
-	log.Printf("[Delivery] Pushed message %s to queue", message.ID)
+	slog.Info("message_queued", "message_id", message.ID, "org_id", message.OrgID)
 
 	res := pb.QueueMessageResponse{
 		MessageId: message.ID.String(),

@@ -2,13 +2,14 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/bilalabdelkadir/chis/internal/config"
 	"github.com/bilalabdelkadir/chis/internal/database"
 	"github.com/bilalabdelkadir/chis/internal/handler"
+	"github.com/bilalabdelkadir/chis/internal/logger"
 	"github.com/bilalabdelkadir/chis/internal/middleware"
 	"github.com/bilalabdelkadir/chis/internal/repository"
 	"github.com/bilalabdelkadir/chis/internal/router"
@@ -24,18 +25,21 @@ func healthHandler(w http.ResponseWriter, r *http.Request) error {
 }
 
 func main() {
+	logger.Setup()
 	cfg, err := config.LoadEnv()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
 	}
 
 	pool, err := database.Connect(cfg.DbUrl)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to connect", "error", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
 
-	fmt.Println("database connected.")
+	slog.Info("database connected.")
 
 	// Repositories
 	userRepo := repository.NewUserRepository(pool)
@@ -44,12 +48,11 @@ func main() {
 	membershipRepo := repository.NewMembershipRepository(pool)
 	apiKeyRepo := repository.NewApiKeyRepository(pool)
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Println("database connected.")
 	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		slog.Error("failed to connect to delivery service", "error", err)
+		os.Exit(1)
+	}
 
 	deliveryClient := pb.NewDeliveryServiceClient(conn)
 
@@ -65,6 +68,10 @@ func main() {
 
 	router.Setup(r, authHandler, apiKeyHandler, webhookHandler, apiKeyRepo, cfg.JwtSecret)
 
-	fmt.Println("server starting on port", cfg.Port)
-	log.Fatal(http.ListenAndServe(":"+cfg.Port, r))
+	slog.Info("server starting", "port", cfg.Port)
+	err = http.ListenAndServe(":"+cfg.Port, r)
+	if err != nil {
+		slog.Error("failed to start http", "error", err)
+		os.Exit(1)
+	}
 }

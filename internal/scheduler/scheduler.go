@@ -2,7 +2,7 @@ package scheduler
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/bilalabdelkadir/chis/internal/queue"
@@ -31,7 +31,7 @@ func (s *Scheduler) Start(ctx context.Context) {
 		default:
 			err := s.processRetries(ctx)
 			if err != nil {
-				log.Printf("[Scheduler] Error: %v", err)
+				slog.Error("scheduler_error", "error", err)
 			}
 			time.Sleep(5 * time.Second) // Check every 5 seconds
 		}
@@ -45,7 +45,7 @@ func (s *Scheduler) processRetries(ctx context.Context) error {
 	}
 
 	for _, msg := range messages {
-		log.Printf("[Scheduler] Requeueing message %s (attempt %d)", msg.ID, msg.AttemptCount)
+		slog.Info("scheduler_requeue", "message_id", msg.ID, "org_id", msg.OrgID, "attempt_count", msg.AttemptCount)
 		s.queue.Push(ctx, msg.ID.String())
 
 		msg.Status = "pending"

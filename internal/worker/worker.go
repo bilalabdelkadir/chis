@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -79,7 +79,7 @@ func (w *Worker) deliver(ctx context.Context, msg *model.Message) {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	log.Printf("[Worker] Delivering message %s to %s", msg.ID, msg.URL)
+	slog.Info("webhook_delivering", "message_id", msg.ID, "org_id", msg.OrgID, "url", msg.URL)
 
 	start := time.Now()
 	resp, err := w.httpClient.Do(req)
@@ -127,13 +127,13 @@ func (w *Worker) deliver(ctx context.Context, msg *model.Message) {
 	_ = w.attemptRepo.Create(ctx, attempt)
 
 	if success {
-		log.Printf("[Worker] Success: %s (status=%d, duration=%dms)", msg.ID, *statusCode, *durationMS)
+		slog.Info("webhook_delivered", "message_id", msg.ID, "org_id", msg.OrgID, "status_code", *statusCode, "duration_ms", *durationMS)
 		_, err = w.messageRepo.UpdateStatus(ctx, msg.ID, "success")
 	} else {
 		if errorMessage != nil {
-			log.Printf("[Worker] Failed: %s (error=%s)", msg.ID, *errorMessage)
+			slog.Warn("webhook_failed", "message_id", msg.ID, "org_id", msg.OrgID, "error", *errorMessage)
 		} else {
-			log.Printf("[Worker] Failed: %s (status=%d)", msg.ID, *statusCode)
+			slog.Warn("webhook_failed", "message_id", msg.ID, "org_id", msg.OrgID, "status_code", *statusCode)
 		}
 		if msg.AttemptCount < MaxAttempts {
 			backoff := BaseBackoff * time.Duration(1<<msg.AttemptCount) // 1<<n is 2^n

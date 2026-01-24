@@ -2,11 +2,12 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
+	"log/slog"
+	"os"
 
 	"github.com/bilalabdelkadir/chis/internal/config"
 	"github.com/bilalabdelkadir/chis/internal/database"
+	"github.com/bilalabdelkadir/chis/internal/logger"
 	"github.com/bilalabdelkadir/chis/internal/queue"
 	"github.com/bilalabdelkadir/chis/internal/repository"
 	"github.com/bilalabdelkadir/chis/internal/scheduler"
@@ -15,18 +16,22 @@ import (
 var QueueName = "main"
 
 func main() {
+	logger.Setup()
+
 	cfg, err := config.LoadEnv()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
 	}
 
 	pool, err := database.Connect(cfg.DbUrl)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
 
-	fmt.Println("database connected.")
+	slog.Info("database_connected")
 
 	messageRepo := repository.NewMessageRepository(pool)
 
@@ -34,13 +39,13 @@ func main() {
 
 	rdsClient, err := queue.NewRedisClient(ctx, cfg.RedisUrl)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("failed to connect to redis", "error", err)
+		os.Exit(1)
 	}
 	queue := queue.NewQueue(rdsClient, QueueName)
 
-	fmt.Println("scheduler started")
+	slog.Info("scheduler_started")
 
-	// Worker
 	w := scheduler.NewScheduler(messageRepo, queue)
 	w.Start(context.Background())
 }
