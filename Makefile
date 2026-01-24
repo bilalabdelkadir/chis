@@ -1,8 +1,10 @@
 
 # Run the server
-run:
-	go run cmd/server/main.go
-
+run-api:
+	go run cmd/api/main.go
+# Run the worker
+run-worker:
+	go run cmd/worker/main.go
 # Database migrations
 migrate-up:
 	migrate -path internal/database/migrations -database "$(DB_URL)" up
