@@ -4,22 +4,29 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/bilalabdelkadir/chis/internal/model"
+	"github.com/bilalabdelkadir/chis/internal/queue"
 	"github.com/bilalabdelkadir/chis/internal/repository"
+	"github.com/google/uuid"
 )
 
 type Worker struct {
 	messageRepo repository.MessageRepository
 	attemptRepo repository.DeliveryAttemptRepository
+	queue       *queue.Queue
 }
 
-func NewWorker(messageRepo repository.MessageRepository, attemptRepo repository.DeliveryAttemptRepository) *Worker {
+func NewWorker(messageRepo repository.MessageRepository, attemptRepo repository.DeliveryAttemptRepository,
+	queue *queue.Queue,
+) *Worker {
 	return &Worker{
 		messageRepo: messageRepo,
 		attemptRepo: attemptRepo,
+		queue:       queue,
 	}
 }
 
@@ -29,17 +36,22 @@ func (w *Worker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			messages, err := w.messageRepo.FindPending(ctx, 10)
+			messageID, err := w.queue.Pop(ctx)
 			if err != nil {
-				time.Sleep(5 * time.Second)
+				continue
+			}
+			id, err := uuid.Parse(messageID)
+			if err != nil {
 				continue
 			}
 
-			for _, message := range messages {
-				w.deliver(ctx, message)
+			message, err := w.messageRepo.FindById(ctx, id)
+			if err != nil {
+				continue
 			}
 
-			time.Sleep(5 * time.Second)
+			w.deliver(ctx, message)
+
 		}
 	}
 }
@@ -59,6 +71,7 @@ func (w *Worker) deliver(ctx context.Context, msg *model.Message) {
 	req.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{Timeout: 10 * time.Second}
+	log.Printf("[Worker] Delivering message %s to %s", msg.ID, msg.URL)
 
 	start := time.Now()
 	resp, err := client.Do(req)
@@ -106,8 +119,12 @@ func (w *Worker) deliver(ctx context.Context, msg *model.Message) {
 	_ = w.attemptRepo.Create(ctx, attempt)
 
 	if success {
+		log.Printf("[Worker] Success: %s (status=%d, duration=%dms)", msg.ID, *statusCode, *durationMS)
+
 		_, err = w.messageRepo.UpdateStatus(ctx, msg.ID, "success")
 	} else {
+		log.Printf("[Worker] Failed: %s (error=%s)", msg.ID, *errorMessage)
+
 		_, err = w.messageRepo.UpdateStatus(ctx, msg.ID, "failed")
 	}
 }

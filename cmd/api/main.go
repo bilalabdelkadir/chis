@@ -11,9 +11,9 @@ import (
 	"github.com/bilalabdelkadir/chis/internal/database"
 	"github.com/bilalabdelkadir/chis/internal/handler"
 	"github.com/bilalabdelkadir/chis/internal/middleware"
+	"github.com/bilalabdelkadir/chis/internal/queue"
 	"github.com/bilalabdelkadir/chis/internal/repository"
 	"github.com/bilalabdelkadir/chis/internal/router"
-	"github.com/bilalabdelkadir/chis/internal/worker"
 )
 
 func healthHandler(w http.ResponseWriter, r *http.Request) error {
@@ -21,6 +21,8 @@ func healthHandler(w http.ResponseWriter, r *http.Request) error {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	return nil
 }
+
+var QueueName = "main"
 
 func main() {
 	cfg, err := config.LoadEnv()
@@ -43,12 +45,21 @@ func main() {
 	membershipRepo := repository.NewMembershipRepository(pool)
 	apiKeyRepo := repository.NewApiKeyRepository(pool)
 	messageRepo := repository.NewMessageRepository(pool)
-	attemptRepo := repository.NewDeliveryAttemptsRepository(pool)
+
+	ctx := context.Background()
+
+	rdsClient, err := queue.NewRedisClient(ctx, cfg.RedisUrl)
+	if err != nil {
+		log.Fatal(err)
+	}
+	queue := queue.NewQueue(rdsClient, QueueName)
+
+	fmt.Println("database connected.")
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(userRepo, accountRepo, orgRepo, membershipRepo, cfg.JwtSecret)
 	apiKeyHandler := handler.NewApiKeyHandler(membershipRepo, apiKeyRepo)
-	webhookHandler := handler.NewWebhookHandler(messageRepo)
+	webhookHandler := handler.NewWebhookHandler(messageRepo, queue)
 
 	// Router
 	r := router.NewRouter()
@@ -57,11 +68,6 @@ func main() {
 
 	router.Setup(r, authHandler, apiKeyHandler, webhookHandler, apiKeyRepo, cfg.JwtSecret)
 
-	// Worker
-	w := worker.NewWorker(messageRepo, attemptRepo)
-	go w.Start(context.Background())
-
-	fmt.Println("worker started")
 	fmt.Println("server starting on port", cfg.Port)
 	log.Fatal(http.ListenAndServe(":"+cfg.Port, r))
 }

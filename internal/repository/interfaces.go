@@ -34,6 +34,7 @@ type MessageRepository interface {
 	Create(ctx context.Context, message *model.Message) error
 	FindPending(ctx context.Context, limit int) ([]*model.Message, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string) (*model.Message, error)
+	FindById(ctx context.Context, id uuid.UUID) (*model.Message, error)
 }
 
 type OrganizationRepository interface {

@@ -5,6 +5,7 @@ import (
 
 	"github.com/bilalabdelkadir/chis/internal/model"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -99,4 +100,32 @@ func (r *PostgresMessageRepository) UpdateStatus(ctx context.Context, id uuid.UU
 	}
 
 	return msg, nil
+}
+
+func (r *PostgresMessageRepository) FindById(ctx context.Context, id uuid.UUID) (*model.Message, error) {
+	var msg model.Message
+
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, org_id, method, url, payload, status, created_at, updated_at
+		FROM messages
+		WHERE id = $1
+	`, id).Scan(
+		&msg.ID,
+		&msg.OrgID,
+		&msg.Method,
+		&msg.URL,
+		&msg.Payload,
+		&msg.Status,
+		&msg.CreatedAt,
+		&msg.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	return &msg, nil
 }

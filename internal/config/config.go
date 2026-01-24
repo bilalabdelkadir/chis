@@ -11,6 +11,7 @@ type Config struct {
 	Port      string
 	DbUrl     string
 	JwtSecret string
+	RedisUrl  string
 }
 
 func LoadEnv() (*Config, error) {
@@ -34,10 +35,16 @@ func LoadEnv() (*Config, error) {
 		return nil, errors.New("JWT_SECRET not found.")
 	}
 
+	redisUlr := os.Getenv("REDIS_URL")
+	if redisUlr == "" {
+		return nil, errors.New("REDIS_URL not found.")
+	}
+
 	return &Config{
 		Port:      port,
 		DbUrl:     dbUrl,
 		JwtSecret: jwtSecret,
+		RedisUrl:  redisUlr,
 	}, nil
 
 }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/bilalabdelkadir/chis/internal/middleware"
 	"github.com/bilalabdelkadir/chis/internal/model"
+	"github.com/bilalabdelkadir/chis/internal/queue"
 	"github.com/bilalabdelkadir/chis/internal/repository"
 	"github.com/bilalabdelkadir/chis/pkg/apperror"
 	"github.com/bilalabdelkadir/chis/pkg/response"
@@ -15,6 +16,7 @@ import (
 
 type WebhookHandler struct {
 	messageRepo repository.MessageRepository
+	queue       *queue.Queue
 }
 
 type SendWebhookRequest struct {
@@ -30,9 +32,11 @@ type SendWebhookResponse struct {
 
 func NewWebhookHandler(
 	messageRepo repository.MessageRepository,
+	queue *queue.Queue,
 ) *WebhookHandler {
 	return &WebhookHandler{
 		messageRepo: messageRepo,
+		queue:       queue,
 	}
 }
 
@@ -73,6 +77,8 @@ func (h *WebhookHandler) Send(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
+
+	h.queue.Push(r.Context(), message.ID.String())
 
 	res := SendWebhookResponse{
 		MessageID: message.ID,
