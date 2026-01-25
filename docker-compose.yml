@@ -1,0 +1,75 @@
+services:
+  database:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - '6373:6379'
+
+  api:
+    build:
+      context: .
+      args:
+        SERVICE: api
+    environment:
+      DB_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
+      DELIVERY_GRPC_ADDR: ${DELIVERY_GRPC_ADDR}
+      REDIS_URL: ${REDIS_URL}
+    depends_on:
+      - database
+      - redis
+    ports:
+      - '8080:8080'
+
+  delivery:
+    build:
+      context: .
+      args:
+        SERVICE: delivery
+    environment:
+      DB_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?sslmode=disable
+      REDIS_URL: ${REDIS_URL}
+    depends_on:
+      - database
+      - redis
+    ports:
+      - '8082:8082'
+      - '50051:50051'
+
+  worker:
+    build:
+      context: .
+      args:
+        SERVICE: worker
+    environment:
+      DB_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?sslmode=disable
+      REDIS_URL: ${REDIS_URL}
+    depends_on:
+      - database
+      - redis
+    ports:
+      - '8083:8083'
+
+  scheduler:
+    build:
+      context: .
+      args:
+        SERVICE: scheduler
+    environment:
+      DB_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?sslmode=disable
+      REDIS_URL: ${REDIS_URL}
+    depends_on:
+      - database
+      - redis
+    ports:
+      - '8084:8084'

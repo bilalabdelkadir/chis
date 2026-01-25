@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
@@ -33,6 +34,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if cfg.JwtSecret == "" || cfg.GrpcAddr == "" {
+		slog.Error("missing env vars", "error", errors.New("missing JWT_SECRET or DELIVERY_GRPC_ADDR env var"))
+		os.Exit(1)
+	}
+
 	pool, err := database.Connect(cfg.DbUrl)
 	if err != nil {
 		slog.Error("failed to connect", "error", err)
@@ -49,7 +55,7 @@ func main() {
 	membershipRepo := repository.NewMembershipRepository(pool)
 	apiKeyRepo := repository.NewApiKeyRepository(pool)
 
-	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(cfg.GrpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		slog.Error("failed to connect to delivery service", "error", err)
 		os.Exit(1)

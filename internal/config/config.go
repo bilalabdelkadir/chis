@@ -12,6 +12,7 @@ type Config struct {
 	DbUrl     string
 	JwtSecret string
 	RedisUrl  string
+	GrpcAddr  string
 }
 
 func LoadEnv() (*Config, error) {
@@ -31,20 +32,19 @@ func LoadEnv() (*Config, error) {
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 
-	if jwtSecret == "" {
-		return nil, errors.New("JWT_SECRET not found.")
-	}
-
 	redisUlr := os.Getenv("REDIS_URL")
 	if redisUlr == "" {
 		return nil, errors.New("REDIS_URL not found.")
 	}
+
+	grpcAddr := os.Getenv("DELIVERY_GRPC_ADDR")
 
 	return &Config{
 		Port:      port,
 		DbUrl:     dbUrl,
 		JwtSecret: jwtSecret,
 		RedisUrl:  redisUlr,
+		GrpcAddr:  grpcAddr,
 	}, nil
 
 }
