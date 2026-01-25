@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: chis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: 799491730030.dkr.ecr.us-east-1.amazonaws.com/chis-api:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: chis-secret
+                  key: DB_URL
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: chis-secret
+                  key: JWT_SECRET
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: chis-config
+                  key: REDIS_URL
+            - name: DELIVERY_GRPC_ADDR
+              valueFrom:
+                configMapKeyRef:
+                  name: chis-config
+                  key: DELIVERY_GRPC_ADDR
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: chis
+spec:
+  type: LoadBalancer
+  selector:
+    app: api
+  ports:
+    - port: 80
+      targetPort: 8080

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: chis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: 799491730030.dkr.ecr.us-east-1.amazonaws.com/chis-worker:latest
+          env:
+            - name: DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: chis-secret
+                  key: DB_URL
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: chis-config
+                  key: REDIS_URL

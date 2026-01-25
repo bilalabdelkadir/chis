@@ -16,6 +16,8 @@ chis
 # Go coverage
 *.out
 coverage.html
+#k8
+k8s/secret.yaml
 
 # Dependency directories
 /vendor/
