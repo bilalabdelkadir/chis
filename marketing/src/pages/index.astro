@@ -1,0 +1,295 @@
+---
+import Layout from '../layouts/main.astro';
+---
+
+<Layout>
+	<!-- Nav -->
+	<nav class="fixed top-0 w-full z-50 border-b border-surface-800 bg-surface-950/80 backdrop-blur-md">
+		<div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+			<a href="/" class="text-white font-semibold text-lg tracking-tight">chis</a>
+			<div class="flex items-center gap-6">
+				<a href="#features" class="text-sm text-surface-400 hover:text-white transition-colors">Features</a>
+				<a href="#pricing" class="text-sm text-surface-400 hover:text-white transition-colors">Pricing</a>
+				<a href="#" class="text-sm font-medium text-surface-950 bg-white rounded-md px-3.5 py-1.5 hover:bg-surface-200 transition-colors">Get Started</a>
+			</div>
+		</div>
+	</nav>
+
+	<main>
+		<!-- Hero -->
+		<section class="pt-32 pb-20 px-6">
+			<div class="max-w-3xl mx-auto text-center">
+				<div class="inline-block mb-6 px-3 py-1 text-xs font-medium text-brand-400 bg-brand-500/10 border border-brand-500/20 rounded-full">
+					Now in beta
+				</div>
+				<h1 class="text-4xl sm:text-5xl font-bold text-white leading-tight tracking-tight">
+					Webhook delivery that<br />just works.
+				</h1>
+				<p class="mt-5 text-lg text-surface-400 max-w-xl mx-auto leading-relaxed">
+					Send once. We handle retries, logging, and delivery confirmation. Stop building webhook infrastructure from scratch.
+				</p>
+				<div class="mt-8 flex items-center justify-center gap-3">
+					<a href="#" class="inline-flex items-center px-5 py-2.5 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors">
+						Get Started Free
+					</a>
+					<a href="#how-it-works" class="inline-flex items-center px-5 py-2.5 text-sm font-medium text-surface-300 border border-surface-700 rounded-lg hover:border-surface-600 hover:text-white transition-colors">
+						See how it works
+					</a>
+				</div>
+
+				<!-- Code preview -->
+				<div class="mt-12 text-left max-w-2xl mx-auto">
+					<div class="rounded-xl border border-surface-800 bg-surface-900 overflow-hidden">
+						<div class="flex items-center gap-2 px-4 py-3 border-b border-surface-800">
+							<span class="w-3 h-3 rounded-full bg-surface-700"></span>
+							<span class="w-3 h-3 rounded-full bg-surface-700"></span>
+							<span class="w-3 h-3 rounded-full bg-surface-700"></span>
+							<span class="ml-2 text-xs text-surface-600">Send a webhook</span>
+						</div>
+						<pre class="p-5 text-sm leading-relaxed overflow-x-auto"><code set:html={`<span class="text-brand-400">curl</span> <span class="text-surface-400">-X POST</span> https://api.trychis.com/v1/webhooks \\
+  <span class="text-surface-400">-H</span> <span class="text-green-400">"Authorization: Bearer sk_live_..."</span> \\
+  <span class="text-surface-400">-d</span> <span class="text-green-400">'{
+    "url": "https://your-app.com/webhooks",
+    "event": "payment.completed",
+    "payload": { "amount": 4999 }
+  }'</span>`} /></pre>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Problem -->
+		<section class="py-20 px-6 border-t border-surface-800/50">
+			<div class="max-w-5xl mx-auto">
+				<div class="max-w-2xl">
+					<p class="text-sm font-medium text-brand-400 mb-3">The problem</p>
+					<h2 class="text-3xl font-bold text-white tracking-tight">Webhooks are deceptively hard.</h2>
+					<p class="mt-4 text-surface-400 leading-relaxed">
+						You think it's just an HTTP POST. Then endpoints go down, payloads get lost, and you're debugging at 2am with no logs to look at.
+					</p>
+				</div>
+
+				<div class="mt-12 grid sm:grid-cols-3 gap-6">
+					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
+						<div class="w-10 h-10 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
+							<span class="text-red-400 text-lg">!</span>
+						</div>
+						<h3 class="text-white font-medium mb-2">Silent failures</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							Endpoints return 500s and you never know. Your users wonder why nothing happened.
+						</p>
+					</div>
+					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
+						<div class="w-10 h-10 rounded-lg bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center mb-4">
+							<span class="text-yellow-400 text-lg">&#8635;</span>
+						</div>
+						<h3 class="text-white font-medium mb-2">Retry logic is a mess</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							Exponential backoff, idempotency keys, max attempts — all code you'd rather not write.
+						</p>
+					</div>
+					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
+						<div class="w-10 h-10 rounded-lg bg-orange-500/10 border border-orange-500/20 flex items-center justify-center mb-4">
+							<span class="text-orange-400 text-lg">?</span>
+						</div>
+						<h3 class="text-white font-medium mb-2">Zero visibility</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							No delivery logs, no status tracking. When something breaks, you're flying blind.
+						</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- How it works -->
+		<section id="how-it-works" class="py-20 px-6 border-t border-surface-800/50">
+			<div class="max-w-5xl mx-auto">
+				<div class="max-w-2xl">
+					<p class="text-sm font-medium text-brand-400 mb-3">How it works</p>
+					<h2 class="text-3xl font-bold text-white tracking-tight">Three steps. That's it.</h2>
+				</div>
+
+				<div class="mt-12 grid sm:grid-cols-3 gap-8">
+					<div class="relative">
+						<div class="text-5xl font-bold text-surface-800 mb-4">01</div>
+						<h3 class="text-white font-medium mb-2">You send</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							Make a single API call with the event, payload, and destination URL. That's your only job.
+						</p>
+					</div>
+					<div class="relative">
+						<div class="text-5xl font-bold text-surface-800 mb-4">02</div>
+						<h3 class="text-white font-medium mb-2">We deliver</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							Chis delivers the webhook with automatic retries, exponential backoff, and signature verification.
+						</p>
+					</div>
+					<div class="relative">
+						<div class="text-5xl font-bold text-surface-800 mb-4">03</div>
+						<h3 class="text-white font-medium mb-2">You monitor</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							See every delivery attempt, response code, and latency in the dashboard. Debug in seconds.
+						</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Features -->
+		<section id="features" class="py-20 px-6 border-t border-surface-800/50">
+			<div class="max-w-5xl mx-auto">
+				<div class="max-w-2xl">
+					<p class="text-sm font-medium text-brand-400 mb-3">Features</p>
+					<h2 class="text-3xl font-bold text-white tracking-tight">Everything you need, nothing you don't.</h2>
+				</div>
+
+				<div class="mt-12 grid sm:grid-cols-2 gap-6">
+					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
+						<h3 class="text-white font-medium mb-2">Automatic retries</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							Failed deliveries are retried with exponential backoff. Configure max attempts and intervals to fit your use case.
+						</p>
+					</div>
+					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
+						<h3 class="text-white font-medium mb-2">Delivery logs</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							Full request/response logs for every delivery attempt. Status codes, headers, timing — all searchable.
+						</p>
+					</div>
+					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
+						<h3 class="text-white font-medium mb-2">Multiple endpoints</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							Route events to different URLs. Fan out a single event to multiple consumers with one API call.
+						</p>
+					</div>
+					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
+						<h3 class="text-white font-medium mb-2">API-first</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							Everything is an API. Create endpoints, send events, and query logs programmatically. No UI required.
+						</p>
+					</div>
+					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
+						<h3 class="text-white font-medium mb-2">Signature verification</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							Every webhook is signed with HMAC-SHA256. Your consumers can verify payloads are authentic and untampered.
+						</p>
+					</div>
+					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
+						<h3 class="text-white font-medium mb-2">Event types</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							Define custom event types and subscribe endpoints to specific events. Only deliver what's relevant.
+						</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Pricing -->
+		<section id="pricing" class="py-20 px-6 border-t border-surface-800/50">
+			<div class="max-w-5xl mx-auto">
+				<div class="max-w-2xl">
+					<p class="text-sm font-medium text-brand-400 mb-3">Pricing</p>
+					<h2 class="text-3xl font-bold text-white tracking-tight">Start free. Scale when ready.</h2>
+					<p class="mt-4 text-surface-400">
+						No credit card required. Upgrade when your webhook volume grows.
+					</p>
+				</div>
+
+				<div class="mt-12 grid sm:grid-cols-2 gap-6 max-w-3xl">
+					<!-- Free tier -->
+					<div class="rounded-xl border border-surface-800 bg-surface-900 p-8">
+						<h3 class="text-white font-medium">Free</h3>
+						<div class="mt-4">
+							<span class="text-4xl font-bold text-white">$0</span>
+							<span class="text-surface-400 text-sm">/month</span>
+						</div>
+						<ul class="mt-6 space-y-3 text-sm text-surface-400">
+							<li class="flex items-start gap-2">
+								<span class="text-brand-400 mt-0.5">&#10003;</span>
+								<span>5,000 events/month</span>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-brand-400 mt-0.5">&#10003;</span>
+								<span>3 endpoints</span>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-brand-400 mt-0.5">&#10003;</span>
+								<span>7-day log retention</span>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-brand-400 mt-0.5">&#10003;</span>
+								<span>Automatic retries</span>
+							</li>
+						</ul>
+						<a href="#" class="mt-8 block text-center text-sm font-medium border border-surface-700 rounded-lg px-4 py-2.5 text-surface-300 hover:text-white hover:border-surface-600 transition-colors">
+							Get Started
+						</a>
+					</div>
+
+					<!-- Pro tier -->
+					<div class="rounded-xl border border-brand-500/30 bg-surface-900 p-8 relative">
+						<div class="absolute -top-3 left-6 px-2.5 py-0.5 text-xs font-medium bg-brand-600 text-white rounded-full">
+							Popular
+						</div>
+						<h3 class="text-white font-medium">Pro</h3>
+						<div class="mt-4">
+							<span class="text-4xl font-bold text-white">$29</span>
+							<span class="text-surface-400 text-sm">/month</span>
+						</div>
+						<ul class="mt-6 space-y-3 text-sm text-surface-400">
+							<li class="flex items-start gap-2">
+								<span class="text-brand-400 mt-0.5">&#10003;</span>
+								<span>100,000 events/month</span>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-brand-400 mt-0.5">&#10003;</span>
+								<span>Unlimited endpoints</span>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-brand-400 mt-0.5">&#10003;</span>
+								<span>30-day log retention</span>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-brand-400 mt-0.5">&#10003;</span>
+								<span>Custom retry policies</span>
+							</li>
+							<li class="flex items-start gap-2">
+								<span class="text-brand-400 mt-0.5">&#10003;</span>
+								<span>Priority support</span>
+							</li>
+						</ul>
+						<a href="#" class="mt-8 block text-center text-sm font-medium bg-brand-600 rounded-lg px-4 py-2.5 text-white hover:bg-brand-700 transition-colors">
+							Get Started
+						</a>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Final CTA -->
+		<section class="py-20 px-6 border-t border-surface-800/50">
+			<div class="max-w-2xl mx-auto text-center">
+				<h2 class="text-3xl font-bold text-white tracking-tight">Stop building webhook plumbing.</h2>
+				<p class="mt-4 text-surface-400 leading-relaxed">
+					You have features to ship. Let Chis handle the delivery.
+				</p>
+				<a href="#" class="inline-flex items-center mt-8 px-6 py-3 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors">
+					Get Started Free
+				</a>
+			</div>
+		</section>
+
+		<!-- Footer -->
+		<footer class="py-10 px-6 border-t border-surface-800/50">
+			<div class="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+				<p class="text-sm text-surface-600">&copy; 2025 Chis. All rights reserved.</p>
+				<div class="flex items-center gap-6">
+					<a href="#" class="text-sm text-surface-600 hover:text-surface-400 transition-colors">Docs</a>
+					<a href="#" class="text-sm text-surface-600 hover:text-surface-400 transition-colors">Blog</a>
+					<a href="#" class="text-sm text-surface-600 hover:text-surface-400 transition-colors">GitHub</a>
+					<a href="#" class="text-sm text-surface-600 hover:text-surface-400 transition-colors">Twitter</a>
+				</div>
+			</div>
+		</footer>
+	</main>
+</Layout>
