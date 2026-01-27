@@ -72,6 +72,7 @@ func main() {
 
 	// Router
 	r := router.NewRouter()
+	r.Use(middleware.CORS(cfg.Env, cfg.Origin))
 	r.Use(middleware.Logging)
 	r.Get("/health", healthHandler)
 	go func() {

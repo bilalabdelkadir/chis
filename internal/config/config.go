@@ -13,6 +13,8 @@ type Config struct {
 	JwtSecret string
 	RedisUrl  string
 	GrpcAddr  string
+	Env       string
+	Origin    string
 }
 
 func LoadEnv() (*Config, error) {
@@ -39,12 +41,24 @@ func LoadEnv() (*Config, error) {
 
 	grpcAddr := os.Getenv("DELIVERY_GRPC_ADDR")
 
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "development"
+	}
+
+	origin := os.Getenv("CORS_ORIGIN")
+	if origin == "" {
+		origin = "localhost:8080"
+	}
+
 	return &Config{
 		Port:      port,
 		DbUrl:     dbUrl,
 		JwtSecret: jwtSecret,
 		RedisUrl:  redisUlr,
 		GrpcAddr:  grpcAddr,
+		Env:       env,
+		Origin:    origin,
 	}, nil
 
 }
