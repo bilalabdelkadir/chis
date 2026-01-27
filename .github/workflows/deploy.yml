@@ -2,7 +2,16 @@ name: Deploy to VPS
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+    paths:
+      - 'cmd/**'
+      - 'internal/**'
+      - 'proto/**'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - 'go.mod'
+      - 'go.sum'
 
 jobs:
   build-and-deploy:
