@@ -10,6 +10,7 @@ func Setup(r *Router,
 	authHandler *handler.AuthHandler,
 	apiKeyHandler *handler.ApiKeyHandler,
 	webhookHandler *handler.WebhookHandler,
+	dashboardHandler *handler.DashboardHandler,
 	apiKeyRepo repository.ApiKeyRepository,
 	secret string,
 ) {
@@ -26,9 +27,17 @@ func Setup(r *Router,
 
 	r.Route("/api", func(r *Router) {
 		r.Use(middleware.ValidateToken(secret))
+
 		r.Route("/api-key", func(r *Router) {
 			r.Post("/create", apiKeyHandler.Create)
+			r.Get("/list", apiKeyHandler.List)
+			r.Delete("/{id}", apiKeyHandler.Delete)
 		})
-	})
 
+		r.Route("/dashboard", func(r *Router) {
+			r.Get("/stats", dashboardHandler.Stats)
+		})
+
+		r.Get("/webhook-logs", dashboardHandler.WebhookLogs)
+	})
 }

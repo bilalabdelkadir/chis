@@ -54,6 +54,7 @@ func main() {
 	orgRepo := repository.NewOrganizationRepository(pool)
 	membershipRepo := repository.NewMembershipRepository(pool)
 	apiKeyRepo := repository.NewApiKeyRepository(pool)
+	messageRepo := repository.NewMessageRepository(pool)
 
 	conn, err := grpc.NewClient(cfg.GrpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -67,6 +68,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(userRepo, accountRepo, orgRepo, membershipRepo, cfg.JwtSecret)
 	apiKeyHandler := handler.NewApiKeyHandler(membershipRepo, apiKeyRepo)
 	webhookHandler := handler.NewWebhookHandler(deliveryClient)
+	dashboardHandler := handler.NewDashboardHandler(membershipRepo, messageRepo)
 
 	// Router
 	r := router.NewRouter()
@@ -79,7 +81,7 @@ func main() {
 		http.ListenAndServe(":9090", mux)
 	}()
 
-	router.Setup(r, authHandler, apiKeyHandler, webhookHandler, apiKeyRepo, cfg.JwtSecret)
+	router.Setup(r, authHandler, apiKeyHandler, webhookHandler, dashboardHandler, apiKeyRepo, cfg.JwtSecret)
 
 	slog.Info("server starting", "port", cfg.Port)
 	err = http.ListenAndServe(":"+cfg.Port, r)
