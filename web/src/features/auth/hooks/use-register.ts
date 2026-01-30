@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { ApiRequestError, type FieldError } from "@/shared/api/api-error";
 import { registerUser } from "../api/auth-api";
 
 export function useRegister() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get("redirect");
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -26,7 +28,7 @@ export function useRegister() {
 
     try {
       await registerUser({ email, password, firstName, lastName });
-      navigate("/login", { replace: true });
+      navigate(redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : "/login", { replace: true });
     } catch (err) {
       if (err instanceof ApiRequestError) {
         setError(err.message);

@@ -8,6 +8,8 @@ import { OverviewPage } from "@/features/dashboard/pages/overview-page";
 import { ApiKeysPage } from "@/features/dashboard/pages/api-keys-page";
 import { LogsPage } from "@/features/dashboard/pages/logs-page";
 import { PlaygroundPage } from "@/features/dashboard/pages/playground-page";
+import { MembersPage } from "@/features/dashboard/pages/members-page";
+import { AcceptInvitePage } from "@/features/invite/accept-invite-page";
 
 export const router = createBrowserRouter([
   {
@@ -28,8 +30,10 @@ export const router = createBrowserRouter([
           { path: "api-keys", element: <ApiKeysPage /> },
           { path: "logs", element: <LogsPage /> },
           { path: "playground", element: <PlaygroundPage /> },
+          { path: "members", element: <MembersPage /> },
         ],
       },
+      { path: "/invite/accept", element: <AcceptInvitePage /> },
     ],
   },
   {

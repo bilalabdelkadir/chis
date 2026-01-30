@@ -1,5 +1,5 @@
 import { NavLink } from "react-router";
-import { BarChart3, Key, ScrollText, Play } from "lucide-react";
+import { BarChart3, Key, ScrollText, Play, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -7,6 +7,7 @@ const navItems = [
   { to: "/dashboard/api-keys", label: "API Keys", icon: Key, end: false },
   { to: "/dashboard/logs", label: "Logs", icon: ScrollText, end: false },
   { to: "/dashboard/playground", label: "Playground", icon: Play, end: false },
+  { to: "/dashboard/members", label: "Members", icon: Users, end: false },
 ];
 
 export function DashboardNav() {

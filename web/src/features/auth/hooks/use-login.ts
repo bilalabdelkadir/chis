@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "@/shared/hooks/use-auth";
 import { ApiRequestError, type FieldError } from "@/shared/api/api-error";
 import { loginUser } from "../api/auth-api";
 
 export function useLogin() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { setAuth } = useAuth();
 
   const [email, setEmail] = useState("");
@@ -27,7 +28,8 @@ export function useLogin() {
     try {
       const response = await loginUser({ email, password });
       setAuth(response.token, { id: "", email, firstName: "" });
-      navigate("/dashboard", { replace: true });
+      const redirect = searchParams.get("redirect") || "/dashboard";
+      navigate(redirect, { replace: true });
     } catch (err) {
       if (err instanceof ApiRequestError) {
         setError(err.message);

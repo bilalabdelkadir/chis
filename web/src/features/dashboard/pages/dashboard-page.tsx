@@ -2,6 +2,7 @@ import { Outlet } from "react-router";
 import { Separator } from "@/components/ui/separator";
 import { DashboardHeader } from "../components/dashboard-header";
 import { DashboardNav } from "../components/dashboard-nav";
+import { PendingInvitationsDialog } from "../components/pending-invitations-dialog";
 
 export function DashboardPage() {
   return (
@@ -10,6 +11,7 @@ export function DashboardPage() {
       <DashboardNav />
       <Separator />
       <Outlet />
+      <PendingInvitationsDialog />
     </div>
   );
 }

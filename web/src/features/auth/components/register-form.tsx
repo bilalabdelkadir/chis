@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,6 +10,9 @@ import {
 import { useRegister } from "../hooks/use-register";
 
 export function RegisterForm() {
+  const [searchParams] = useSearchParams();
+  const redirect = searchParams.get("redirect");
+
   const {
     firstName,
     setFirstName,
@@ -90,7 +93,7 @@ export function RegisterForm() {
         </Button>
         <p className="text-muted-foreground text-center text-sm">
           Already have an account?{" "}
-          <Link to="/login" className="text-primary underline underline-offset-4 hover:text-primary/80">
+          <Link to={redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : "/login"} className="text-primary underline underline-offset-4 hover:text-primary/80">
             Sign in
           </Link>
         </p>
