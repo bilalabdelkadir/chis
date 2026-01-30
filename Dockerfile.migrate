@@ -1,0 +1,5 @@
+FROM migrate/migrate:v4.17.0
+
+COPY internal/database/migrations /migrations
+
+ENTRYPOINT ["migrate", "-path", "/migrations", "-database"]
