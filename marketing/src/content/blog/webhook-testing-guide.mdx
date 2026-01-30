@@ -1,0 +1,305 @@
+---
+title: "How to Test Webhooks Locally: Tools, Techniques, and Best Practices"
+description: "A practical guide to testing webhook integrations during development. Use ngrok, RequestBin, and local tunneling to debug webhooks before going to production."
+publishedDate: "2026-01-18"
+author: "Chis Team"
+tags: ["webhooks", "testing", "development"]
+keywords: ["webhook testing", "test webhooks locally", "webhook testing tools", "ngrok webhooks", "webhook development", "debug webhooks"]
+featured: false
+draft: false
+---
+
+## The Challenge of Testing Webhooks
+
+Testing a REST API is straightforward: send a request, check the response. Webhooks invert this flow, and that inversion makes testing significantly harder. Instead of your code making outbound calls, an external service sends HTTP requests to your code. During local development, your machine is behind a NAT, a firewall, or both -- the external service has no way to reach `localhost:3000`.
+
+This creates a frustrating development loop. You deploy your webhook handler to a staging server, register the staging URL with the provider, trigger the event, check the staging logs, find the bug, fix it locally, redeploy, and repeat. What should be a five-minute debugging session becomes an hour of deploy cycles.
+
+Fortunately, there are tools and techniques that eliminate this friction entirely. Let us walk through them from simplest to most comprehensive.
+
+## Local Tunneling with ngrok
+
+The most popular solution for local webhook development is tunneling. A tunnel service creates a public URL that forwards traffic to your local machine. ngrok is the standard tool for this.
+
+### Setup
+
+Install ngrok and start a tunnel to your local server:
+
+```bash
+# Install ngrok (macOS)
+brew install ngrok
+
+# Start a tunnel to your local server on port 3000
+ngrok http 3000
+```
+
+ngrok outputs a public URL like `https://a1b2c3d4.ngrok-free.app`. Register this URL as your webhook endpoint with the provider, and all webhook deliveries will be forwarded to your local machine.
+
+### The ngrok Inspection Interface
+
+One of ngrok's most useful features is its built-in web inspector at `http://localhost:4040`. It shows every request that came through the tunnel, including full headers, request body, and your server's response. You can also replay requests -- invaluable when debugging a handler that fails on a specific payload.
+
+### Considerations
+
+ngrok works well but has limitations to be aware of:
+
+- **Free tier URLs change** every time you restart ngrok. You need to re-register the endpoint with your webhook provider each time, or use a paid plan for stable URLs.
+- **Latency**: Requests travel through ngrok's servers, adding 50-200ms of latency. This is irrelevant for development but means your local latency measurements are not representative of production.
+- **Security**: You are exposing a port on your local machine to the internet. Only run ngrok when actively developing, and be mindful of what your server exposes.
+
+Alternatives to ngrok include Cloudflare Tunnel (free, stable URLs if you have a Cloudflare account), localtunnel, and Tailscale Funnel.
+
+## Webhook Inspection Tools
+
+Sometimes you do not need your handler to process the webhook -- you just need to see what the provider is sending. Inspection tools give you a disposable URL that captures and displays incoming requests.
+
+### RequestBin
+
+RequestBin provides a unique URL that logs all incoming HTTP requests. Create a bin, use the URL as your webhook endpoint, trigger an event, and inspect the exact payload the provider sends.
+
+This is particularly useful when:
+
+- You are building a new integration and need to understand the payload format.
+- The provider's documentation is incomplete or inaccurate.
+- You want to capture real payloads to use as test fixtures.
+
+### Webhook.site
+
+Similar to RequestBin, Webhook.site provides a URL and shows requests in real time in your browser. It also supports custom responses, so you can test how the provider handles different status codes from your endpoint.
+
+```
+1. Go to webhook.site, copy the unique URL
+2. Register that URL with your webhook provider
+3. Trigger the event (e.g., make a test payment)
+4. See the exact request in your browser
+5. Copy the payload for use in your test suite
+```
+
+These tools are excellent for exploration and debugging, but they are not a substitute for automated tests.
+
+## Building a Mock Webhook Server
+
+For repeatable development, build a small local server that simulates incoming webhooks. This decouples your development from the external provider entirely.
+
+```javascript
+// mock-webhook-sender.js
+// Simulates a webhook provider sending events to your handler
+const http = require("http");
+const crypto = require("crypto");
+
+const WEBHOOK_SECRET = "whsec_test_secret_123";
+const TARGET_URL = "http://localhost:3000/api/webhooks";
+
+function sendMockWebhook(eventType, payload) {
+  const body = JSON.stringify({
+    id: `evt_${crypto.randomBytes(8).toString("hex")}`,
+    type: eventType,
+    created_at: new Date().toISOString(),
+    data: payload,
+  });
+
+  const signature = crypto
+    .createHmac("sha256", WEBHOOK_SECRET)
+    .update(body)
+    .digest("hex");
+
+  const options = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Webhook-Signature": `sha256=${signature}`,
+      "X-Webhook-Id": `wh_${crypto.randomBytes(8).toString("hex")}`,
+    },
+  };
+
+  const url = new URL(TARGET_URL);
+  const req = http.request(url, options, (res) => {
+    let data = "";
+    res.on("data", (chunk) => (data += chunk));
+    res.on("end", () => {
+      console.log(`[${res.statusCode}] ${eventType}: ${data}`);
+    });
+  });
+
+  req.write(body);
+  req.end();
+}
+
+// Send test events
+sendMockWebhook("order.completed", {
+  id: "ord_123",
+  amount: 4999,
+  currency: "usd",
+});
+
+sendMockWebhook("payment.failed", {
+  id: "pay_456",
+  error: "card_declined",
+  customer_id: "cus_789",
+});
+```
+
+This approach has several advantages: you control exactly what payloads are sent, you can run it offline, and you can include it in your development workflow scripts.
+
+## Writing Integration Tests for Webhooks
+
+Your webhook handler is production code. It deserves proper automated tests. Here is how to structure them.
+
+### Test the Handler Directly
+
+The most straightforward approach is to test your webhook handler as an HTTP endpoint using your framework's test utilities:
+
+```python
+# test_webhook_handler.py
+import hmac
+import hashlib
+import json
+import pytest
+from myapp import create_app
+
+WEBHOOK_SECRET = "whsec_test_secret_123"
+
+def sign_payload(payload: str) -> str:
+    return hmac.new(
+        WEBHOOK_SECRET.encode(),
+        payload.encode(),
+        hashlib.sha256
+    ).hexdigest()
+
+@pytest.fixture
+def client():
+    app = create_app(testing=True)
+    return app.test_client()
+
+def test_order_completed_webhook(client):
+    payload = json.dumps({
+        "id": "evt_test_001",
+        "type": "order.completed",
+        "created_at": "2026-01-18T12:00:00Z",
+        "data": {
+            "id": "ord_123",
+            "amount": 2500,
+            "currency": "usd"
+        }
+    })
+
+    response = client.post(
+        "/api/webhooks",
+        data=payload,
+        content_type="application/json",
+        headers={
+            "X-Webhook-Signature": f"sha256={sign_payload(payload)}"
+        }
+    )
+
+    assert response.status_code == 200
+    # Verify the order was processed in your database
+    order = get_order("ord_123")
+    assert order.status == "completed"
+
+def test_rejects_invalid_signature(client):
+    payload = json.dumps({
+        "id": "evt_test_002",
+        "type": "order.completed",
+        "data": {"id": "ord_456"}
+    })
+
+    response = client.post(
+        "/api/webhooks",
+        data=payload,
+        content_type="application/json",
+        headers={
+            "X-Webhook-Signature": "sha256=invalid_signature"
+        }
+    )
+
+    assert response.status_code == 401
+
+def test_idempotent_processing(client):
+    payload = json.dumps({
+        "id": "evt_test_003",
+        "type": "order.completed",
+        "data": {"id": "ord_789", "amount": 1000}
+    })
+    signature = f"sha256={sign_payload(payload)}"
+    headers = {
+        "X-Webhook-Signature": signature
+    }
+
+    # Send the same event twice
+    response1 = client.post("/api/webhooks", data=payload,
+                            content_type="application/json", headers=headers)
+    response2 = client.post("/api/webhooks", data=payload,
+                            content_type="application/json", headers=headers)
+
+    assert response1.status_code == 200
+    assert response2.status_code == 200
+    # Verify the order was only created once
+    orders = get_orders_by_id("ord_789")
+    assert len(orders) == 1
+```
+
+### Use Fixture Payloads
+
+Capture real payloads from your inspection tools and save them as fixture files. This ensures your tests use realistic data:
+
+```
+tests/
+  fixtures/
+    webhooks/
+      order.completed.json
+      order.refunded.json
+      payment.failed.json
+      customer.updated.json
+```
+
+Load these fixtures in your tests instead of hand-crafting payloads every time.
+
+## Testing Retry Behavior
+
+If you are building the sending side of webhooks, test your retry logic explicitly. Simulate consumer failures and verify that your system retries with the correct backoff timing.
+
+```go
+// TestRetryOnServerError verifies retry behavior when the consumer returns 500
+func TestRetryOnServerError(t *testing.T) {
+    attempts := 0
+    server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        attempts++
+        if attempts < 3 {
+            w.WriteHeader(http.StatusInternalServerError)
+            return
+        }
+        w.WriteHeader(http.StatusOK)
+    }))
+    defer server.Close()
+
+    delivery := NewDelivery(server.URL, testPayload)
+    result := delivery.Execute()
+
+    assert.Equal(t, 3, attempts, "should have attempted 3 times")
+    assert.True(t, result.Success, "should have succeeded on third attempt")
+}
+
+// TestRespectsMaxRetries verifies the system stops after max retries
+func TestRespectsMaxRetries(t *testing.T) {
+    attempts := 0
+    server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        attempts++
+        w.WriteHeader(http.StatusInternalServerError)
+    }))
+    defer server.Close()
+
+    delivery := NewDelivery(server.URL, testPayload)
+    delivery.MaxRetries = 5
+    result := delivery.Execute()
+
+    assert.Equal(t, 6, attempts, "should have made initial attempt + 5 retries")
+    assert.False(t, result.Success, "should have failed after max retries")
+}
+```
+
+Test edge cases too: what happens when the consumer's server is completely unreachable? When it hangs and you hit a timeout? When it returns a 301 redirect? Each of these scenarios exercises different code paths in your delivery logic.
+
+## How Chis Simplifies Webhook Testing
+
+Testing webhook delivery should not require stitching together tunneling tools, inspection services, and hand-rolled mock servers. [Chis](https://trychis.com) provides a send-event API that lets you trigger test deliveries on demand and an events log where you can inspect every delivery attempt with full request and response details. During development, point your Chis endpoint to a local tunnel or test URL, fire events through the API, and see exactly what was sent and how your handler responded -- all from a single dashboard.

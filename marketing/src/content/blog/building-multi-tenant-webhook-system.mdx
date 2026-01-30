@@ -1,0 +1,283 @@
+---
+title: "Building a Multi-Tenant Webhook System: Architecture and Lessons Learned"
+description: "Deep dive into the architecture decisions behind building a multi-tenant webhook delivery system. Covers tenant isolation, queue design, retry scheduling, and scaling."
+publishedDate: "2026-01-16"
+author: "Chis Team"
+tags: ["architecture", "webhooks", "multi-tenant"]
+keywords: ["multi-tenant webhooks", "webhook SaaS architecture", "webhook infrastructure", "webhook system design", "webhook queue architecture", "webhook service"]
+featured: false
+draft: false
+---
+
+## Why Build vs Buy for Webhook Delivery
+
+Every SaaS platform eventually needs to send webhooks. The initial implementation looks deceptively simple: when something happens, POST to the customer's URL. A few hundred lines of code and you are done.
+
+Then reality hits. You need retries because endpoints fail. You need exponential backoff so you do not hammer a struggling endpoint. You need signature verification so consumers can trust the payload. You need delivery logging so your support team can debug "I never received the webhook" tickets. You need a dead letter queue for events that exhaust all retries. You need rate limiting so one customer's misconfigured endpoint does not consume all your worker capacity.
+
+What started as a simple HTTP POST has become a distributed system with queuing, scheduling, monitoring, and multi-tenant isolation concerns. At this point, you have two choices: continue investing engineering time into infrastructure that is not your core product, or use a purpose-built service.
+
+This post is a deep dive into the architecture decisions involved in building a multi-tenant webhook delivery system. Whether you are evaluating the build-vs-buy decision or just curious about the engineering involved, this will give you a concrete understanding of what is under the hood.
+
+## Tenant Isolation
+
+In a multi-tenant webhook system, "tenants" are the organizations using your platform. Each tenant has their own API keys, endpoints, events, and delivery history. Isolation is critical -- both for security and for operational stability.
+
+### API Key Scoping
+
+Every API key is scoped to a single organization. The key itself encodes the organization context:
+
+```
+chis_org_7f3a2b1c_sk_live_4e9d8c7b6a5f...
+       ^^^^^^^^^
+       org identifier embedded in the key
+```
+
+When a request arrives, the API layer extracts the organization from the key before any data access occurs. This prevents accidental cross-tenant data exposure at the earliest possible point.
+
+### Data Isolation
+
+All database queries include the organization ID as a filter. This is enforced at the repository layer, not at the handler layer, so it is impossible for application code to accidentally query across tenants:
+
+```go
+// Repository layer enforces tenant isolation on every query
+func (r *DeliveryRepo) ListByOrganization(ctx context.Context, orgID string, params ListParams) ([]Delivery, error) {
+    query := `
+        SELECT id, event_id, endpoint_url, status, created_at
+        FROM deliveries
+        WHERE organization_id = $1
+        AND created_at >= $2
+        ORDER BY created_at DESC
+        LIMIT $3 OFFSET $4
+    `
+    rows, err := r.db.QueryContext(ctx, query,
+        orgID, params.Since, params.Limit, params.Offset)
+    if err != nil {
+        return nil, fmt.Errorf("list deliveries: %w", err)
+    }
+    defer rows.Close()
+    // ... scan rows
+}
+```
+
+There is no `ListAll()` method that omits the organization filter. The type system and API design make cross-tenant queries structurally impossible in application code.
+
+### Per-Tenant Rate Limiting
+
+A single tenant should not be able to monopolize system resources. Rate limiting is applied at multiple levels:
+
+- **API rate limiting**: Limits on how many events a tenant can send per minute.
+- **Delivery rate limiting**: Limits on concurrent outbound deliveries per tenant, preventing one tenant's high volume from starving others.
+- **Endpoint rate limiting**: Limits per destination URL, protecting consumer endpoints from being overwhelmed.
+
+```go
+type RateLimiter struct {
+    store redis.Client
+}
+
+func (rl *RateLimiter) AllowDelivery(orgID string, endpointURL string) (bool, error) {
+    // Check org-level limit (e.g., 1000 concurrent deliveries)
+    orgKey := fmt.Sprintf("ratelimit:org:%s:deliveries", orgID)
+    orgCount, _ := rl.store.Get(orgKey).Int64()
+    if orgCount >= 1000 {
+        return false, nil
+    }
+
+    // Check endpoint-level limit (e.g., 50 concurrent per endpoint)
+    epKey := fmt.Sprintf("ratelimit:ep:%s", hashURL(endpointURL))
+    epCount, _ := rl.store.Get(epKey).Int64()
+    if epCount >= 50 {
+        return false, nil
+    }
+
+    return true, nil
+}
+```
+
+## Queue Architecture
+
+The queue is the backbone of a webhook delivery system. It decouples event ingestion from delivery, handles backpressure, and enables retry scheduling.
+
+### Redis-Based Queuing
+
+Redis provides the foundation for the delivery queue. New events are pushed onto a sorted set keyed by their scheduled delivery time. Workers poll for events whose delivery time has passed:
+
+```
+ZADD delivery_queue <scheduled_timestamp> <delivery_id>
+```
+
+This approach naturally handles both immediate deliveries (scheduled for "now") and retries (scheduled for a future time). A single data structure serves as both the primary queue and the retry queue.
+
+### Priority Queues
+
+Not all deliveries are equal. A fresh event should be delivered before a third retry attempt. The queue supports priority levels by using multiple sorted sets:
+
+```
+delivery_queue:priority:high    -- first attempts
+delivery_queue:priority:normal  -- second/third retries
+delivery_queue:priority:low     -- later retries
+```
+
+Workers drain the high-priority queue first, then normal, then low. This ensures new events are not stuck behind a backlog of retries from a single unhealthy endpoint.
+
+### Fair Scheduling
+
+Without fair scheduling, a tenant sending 100,000 events could monopolize all workers while other tenants wait. The scheduler implements round-robin across tenants: dequeue one batch from tenant A, then one from tenant B, and so on. No single tenant can starve others regardless of their volume.
+
+## Worker Design
+
+Workers are the processes that actually make the outbound HTTP calls. Their design directly impacts delivery reliability and system throughput.
+
+### Concurrent Workers
+
+Each worker process runs multiple goroutines (or threads, depending on your language) to make concurrent HTTP calls. The concurrency level is tunable:
+
+```go
+type Worker struct {
+    concurrency int
+    httpClient  *http.Client
+    queue       Queue
+}
+
+func (w *Worker) Run(ctx context.Context) {
+    sem := make(chan struct{}, w.concurrency)
+
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        default:
+            delivery, err := w.queue.Dequeue(ctx)
+            if err != nil {
+                time.Sleep(100 * time.Millisecond)
+                continue
+            }
+
+            sem <- struct{}{} // acquire
+            go func() {
+                defer func() { <-sem }() // release
+                w.executeDelivery(ctx, delivery)
+            }()
+        }
+    }
+}
+```
+
+### HTTP Client Configuration
+
+The HTTP client configuration is critical and often overlooked. Sensible defaults for webhook delivery:
+
+```go
+httpClient := &http.Client{
+    Timeout: 30 * time.Second,
+    Transport: &http.Transport{
+        MaxIdleConns:        100,
+        MaxIdleConnsPerHost: 10,
+        IdleConnTimeout:     90 * time.Second,
+        TLSHandshakeTimeout: 10 * time.Second,
+        DisableKeepAlives:   false,
+    },
+    // Do not follow redirects automatically
+    CheckRedirect: func(req *http.Request, via []*http.Request) error {
+        return http.ErrUseLastResponse
+    },
+}
+```
+
+Key decisions: a 30-second timeout prevents workers from being blocked indefinitely by unresponsive endpoints. Connection pooling (`MaxIdleConns`) reuses TCP connections to endpoints that receive frequent deliveries. Redirects are not followed automatically because the consumer registered a specific URL -- a redirect could send the payload somewhere unintended.
+
+## Retry Scheduling
+
+When a delivery fails, it needs to be retried with exponential backoff. The retry scheduler calculates the next attempt time and re-enqueues the delivery:
+
+```go
+func nextRetryDelay(attemptNumber int) time.Duration {
+    // Exponential backoff: 10s, 30s, 90s, 270s, 810s, ...
+    // Capped at 6 hours
+    base := 10 * time.Second
+    delay := base * time.Duration(math.Pow(3, float64(attemptNumber-1)))
+    maxDelay := 6 * time.Hour
+    if delay > maxDelay {
+        delay = maxDelay
+    }
+    // Add jitter: +/- 20%
+    jitter := time.Duration(rand.Int63n(int64(delay) * 4 / 10))
+    return delay - (delay / 5) + jitter
+}
+```
+
+The jitter is important. Without it, if 1,000 deliveries to the same endpoint fail simultaneously, they will all retry at exactly the same time, likely causing the endpoint to fail again. Jitter spreads the retries across a time window.
+
+After a configurable maximum number of attempts (typically 5-8), the delivery is moved to a dead letter queue. From there, it can be manually retried by the tenant through the dashboard or API.
+
+## Delivery Attempt Logging
+
+Every delivery attempt -- not just the final outcome -- is stored as an immutable record:
+
+```sql
+CREATE TABLE delivery_attempts (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    delivery_id     UUID NOT NULL REFERENCES deliveries(id),
+    organization_id UUID NOT NULL,
+    attempt_number  INTEGER NOT NULL,
+    status_code     INTEGER,
+    response_body   TEXT,
+    response_headers JSONB,
+    error_message   TEXT,
+    latency_ms      INTEGER NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_attempts_delivery ON delivery_attempts(delivery_id);
+CREATE INDEX idx_attempts_org_created ON delivery_attempts(organization_id, created_at DESC);
+```
+
+This table grows fast. A system delivering 1 million events per day with an average of 1.2 attempts per delivery produces 1.2 million rows per day. Partitioning by `created_at` and a retention policy (e.g., 30 days) keeps the table manageable.
+
+The payoff is worth the storage cost. When a customer says "my webhook handler is not receiving events," your support team can look up the exact delivery, see every attempt, read the response body from the customer's server, and diagnose the issue in minutes instead of hours.
+
+## Monitoring and Metrics
+
+A multi-tenant system needs metrics at both the system level and the tenant level.
+
+At the system level, track: total deliveries per second, worker utilization, queue depth, and error rates by category (timeout, DNS, TLS, 4xx, 5xx). Prometheus is a natural fit:
+
+```go
+var (
+    deliveriesTotal = prometheus.NewCounterVec(
+        prometheus.CounterOpts{
+            Name: "webhook_deliveries_total",
+            Help: "Total webhook deliveries by status",
+        },
+        []string{"status", "organization_id"},
+    )
+    deliveryLatency = prometheus.NewHistogramVec(
+        prometheus.HistogramOpts{
+            Name:    "webhook_delivery_latency_seconds",
+            Help:    "Delivery latency in seconds",
+            Buckets: []float64{0.1, 0.5, 1, 2, 5, 10, 30},
+        },
+        []string{"organization_id"},
+    )
+)
+```
+
+At the tenant level, expose per-organization dashboards showing their delivery success rate, recent failures, and endpoint health. This self-service visibility reduces support tickets dramatically.
+
+## Scaling Considerations
+
+### Horizontal Worker Scaling
+
+Workers are stateless -- they read from the queue, make an HTTP call, and write the result. This makes horizontal scaling straightforward: add more worker instances to increase throughput. The queue handles coordination.
+
+### Database Pressure
+
+The delivery attempts table is the primary write bottleneck. At high volume, every delivery produces at least one INSERT. Strategies to manage this: batch inserts, write to a buffer (Redis) and flush to the database periodically, or use a time-series database for attempt logs.
+
+### Queue Depth as a Scaling Signal
+
+Monitor queue depth and use it as the input for autoscaling. If the queue depth exceeds a threshold for more than a few minutes, spin up additional worker instances. When it drops, scale back down.
+
+## Lessons Learned from Building Chis
+
+Building [Chis](https://trychis.com) taught us that the hard part of webhook delivery is not the HTTP call -- it is everything around it. Tenant isolation, fair scheduling, retry logic, and comprehensive logging are where the real complexity lives. Every shortcut in these areas eventually becomes a production incident. If you are evaluating whether to build your own webhook infrastructure or use a managed service, we hope this deep dive gives you an honest picture of what is involved. Chis exists so you can skip the months of engineering and get reliable, observable, multi-tenant webhook delivery from day one.

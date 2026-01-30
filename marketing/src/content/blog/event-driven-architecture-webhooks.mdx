@@ -1,0 +1,193 @@
+---
+title: "Event-Driven Architecture with Webhooks: A Practical Introduction"
+description: "Learn how webhooks fit into event-driven architecture. Design event schemas, route events to subscribers, and build loosely coupled systems."
+publishedDate: "2026-01-20"
+author: "Chis Team"
+tags: ["architecture", "webhooks", "events"]
+keywords: ["event driven architecture", "webhooks event driven", "event driven API", "webhook event system", "event schema design", "loosely coupled architecture"]
+featured: false
+draft: false
+---
+
+## What Is Event-Driven Architecture?
+
+In a traditional request-response system, services call each other directly. Service A needs data from Service B, so it sends a request and waits. This creates tight coupling -- Service A must know where Service B lives, what its API looks like, and it blocks until Service B responds.
+
+Event-driven architecture flips this model. Instead of services calling each other, they emit events when something interesting happens. Other services subscribe to the events they care about and react accordingly. The producer does not know or care who is listening.
+
+The core concepts are straightforward:
+
+- **Events** are immutable facts about something that happened: "an order was placed," "a user signed up," "a payment failed."
+- **Producers** emit events when state changes occur in their domain.
+- **Consumers** subscribe to event types they care about and react to them.
+- **An event broker** sits between producers and consumers, handling routing and delivery.
+
+This decoupling is powerful. You can add new consumers without modifying the producer. Services can be deployed, scaled, and updated independently. The system becomes more resilient because a failure in one consumer does not cascade to the producer or other consumers.
+
+## Where Webhooks Fit In
+
+Webhooks are one of the most practical ways to implement event-driven communication, especially when events need to cross network boundaries. While message queues like RabbitMQ or Kafka handle internal event routing within your infrastructure, webhooks use plain HTTP to deliver events to external systems.
+
+Consider a payment platform. When a charge succeeds, the platform emits a `charge.succeeded` event. Internal services might consume this via Kafka, but external merchants need to be notified too. That is where webhooks come in: the platform sends an HTTP POST to each merchant's registered URL with the event payload.
+
+```
+Producer (Payment Platform)
+    |
+    |-- Internal: Kafka topic "charges"
+    |       |-- Analytics Service
+    |       |-- Fraud Detection Service
+    |
+    |-- External: Webhook delivery
+            |-- Merchant A (https://merchant-a.com/webhooks)
+            |-- Merchant B (https://merchant-b.com/webhooks)
+            |-- Merchant C (https://merchant-c.com/webhooks)
+```
+
+Webhooks are HTTP as the transport layer for events. This makes them universally accessible -- any system that can receive an HTTP request can consume webhook events, regardless of language, framework, or infrastructure.
+
+## Designing Event Schemas
+
+A well-designed event schema is the contract between your system and every consumer. Get it wrong and you will be dealing with breaking changes and confused integrators for years. Here are the principles that matter:
+
+### Use a Consistent Envelope
+
+Every event should share a common outer structure:
+
+```json
+{
+  "id": "evt_2f8a3c1d4e5b",
+  "type": "invoice.payment_succeeded",
+  "created_at": "2026-01-20T09:15:32Z",
+  "api_version": "2026-01-01",
+  "data": {
+    "id": "inv_9a8b7c6d",
+    "amount": 4999,
+    "currency": "usd",
+    "customer_id": "cus_1a2b3c4d",
+    "status": "paid"
+  }
+}
+```
+
+The envelope (`id`, `type`, `created_at`, `api_version`) is stable. The `data` field varies by event type. This lets consumers parse the envelope without knowing the specific event type, then route to the appropriate handler.
+
+### Name Events in Past Tense
+
+Events represent things that already happened. Use `order.completed`, not `order.complete` or `complete_order`. Use dot-notation to namespace: `resource.action`. This convention reads naturally and sorts well.
+
+### Version Your Events
+
+Include an `api_version` field in every event. When you need to change the payload structure, you can introduce a new version without breaking existing consumers. Consumers can specify which version they want to receive when they register their endpoint.
+
+### Include Enough Context
+
+Do not force consumers to make API calls to get the data they need. Include the relevant resource state in the event payload. A `customer.updated` event should include the customer's current data, not just their ID.
+
+## Event Routing and Fan-Out
+
+In a webhook system, event routing determines which endpoints receive which events. The simplest model is topic-based routing: consumers subscribe to specific event types.
+
+```python
+# Example: registering a webhook endpoint with event type filtering
+endpoint = chis.endpoints.create(
+    url="https://api.example.com/webhooks",
+    events=["order.completed", "order.refunded", "payment.failed"],
+    description="Order management system"
+)
+```
+
+Fan-out is what happens when a single event needs to be delivered to multiple consumers. If three merchants have registered endpoints for `charge.succeeded`, one charge event produces three independent delivery jobs. Each delivery is independent -- a failure delivering to Merchant A does not affect delivery to Merchant B.
+
+More sophisticated routing can include:
+
+- **Wildcard subscriptions**: subscribe to `order.*` to receive all order-related events.
+- **Conditional routing**: only deliver events matching certain criteria (e.g., orders above a certain amount).
+- **Priority routing**: deliver to high-priority endpoints before low-priority ones.
+
+## Idempotency in Event-Driven Systems
+
+Here is a truth about distributed systems that every developer working with webhooks must internalize: events can and will be delivered more than once. Network timeouts, consumer crashes after processing but before acknowledging, retry mechanisms -- all of these can result in duplicate deliveries.
+
+Your consumers must be idempotent. Processing the same event twice should produce the same outcome as processing it once.
+
+The standard approach is idempotency keys:
+
+```javascript
+async function handleWebhookEvent(event) {
+  // Check if we have already processed this event
+  const existing = await db.processedEvents.findOne({
+    eventId: event.id
+  });
+
+  if (existing) {
+    console.log(`Event ${event.id} already processed, skipping`);
+    return { status: 200, body: "already processed" };
+  }
+
+  // Process the event
+  await processEvent(event);
+
+  // Record that we processed it
+  await db.processedEvents.insertOne({
+    eventId: event.id,
+    processedAt: new Date(),
+    eventType: event.type
+  });
+
+  return { status: 200, body: "ok" };
+}
+```
+
+Use the event's unique `id` field as the idempotency key. Store processed event IDs in a database or cache with a reasonable TTL (7-30 days is typical). This way, if the same event arrives twice, the second delivery is a no-op.
+
+For operations that are naturally idempotent -- like setting a status to "paid" -- you may not need explicit deduplication. But for operations like "add $10 credit," you absolutely do.
+
+## Ordering and Eventual Consistency
+
+In event-driven systems, you generally cannot guarantee that events arrive in the exact order they were produced. Network latency, retries, and parallel processing all conspire against strict ordering.
+
+Consider this scenario: a user updates their email, then updates it again. Two events are produced -- `user.updated` with the first email, then `user.updated` with the second. If the first delivery fails and gets retried, the consumer might process the second event before the first, ending up with stale data.
+
+Strategies to handle this:
+
+- **Include a timestamp or sequence number** in every event. Consumers can compare against their last-seen value and discard stale events.
+- **Design for eventual consistency.** Accept that the system will temporarily be in an inconsistent state and converge to the correct state over time.
+- **Use "full state" events** rather than "delta" events. Instead of sending "email changed from A to B," send the complete current state. The last event to be processed wins, regardless of order.
+
+```json
+{
+  "type": "customer.updated",
+  "data": {
+    "id": "cus_1a2b3c4d",
+    "email": "new@example.com",
+    "name": "Jane Doe",
+    "updated_at": "2026-01-20T10:32:00Z"
+  }
+}
+```
+
+By including `updated_at`, the consumer can implement a "last writer wins" strategy: only apply the update if `updated_at` is newer than the currently stored value.
+
+## Webhooks vs Message Queues
+
+Webhooks and message queues are not competing technologies -- they solve different problems and often coexist in the same architecture.
+
+| Aspect | Webhooks | Message Queues |
+|---|---|---|
+| **Transport** | HTTP/HTTPS | AMQP, proprietary protocols |
+| **Consumer** | Any HTTP server | Must use queue client library |
+| **Boundary** | Crosses network boundaries | Typically internal infrastructure |
+| **Delivery** | Push-based | Pull-based (consumer controls pace) |
+| **Ordering** | No guarantees | Can guarantee within partitions |
+| **Backpressure** | Limited (consumer must keep up) | Built-in (messages wait in queue) |
+| **Setup for consumer** | Register a URL | Deploy queue consumer, configure connection |
+
+**Use webhooks when** you need to notify external systems, when consumers are behind firewalls you do not control, or when you want the lowest possible barrier to integration. Any developer who can stand up an HTTP endpoint can consume webhooks.
+
+**Use message queues when** you need strict ordering guarantees, fine-grained backpressure control, or when producer and consumer are within the same infrastructure. Queues excel at high-throughput internal communication.
+
+Many systems use both: a message queue internally for reliable event processing, and webhooks as the external-facing delivery mechanism that reads from that queue.
+
+## How Chis Supports Event-Driven Webhooks
+
+Building the event routing, fan-out delivery, and retry infrastructure for webhooks is a substantial engineering effort. [Chis](https://trychis.com) provides the event delivery layer so you can focus on your core product. Define your event types, register subscriber endpoints with topic-based filtering, and Chis handles the fan-out delivery, retries, and idempotency tracking. Your system emits events; Chis makes sure every subscriber receives them reliably.

@@ -1,0 +1,19 @@
+---
+interface Props {
+	activePage?: 'home' | 'blog';
+}
+const { activePage = 'home' } = Astro.props;
+---
+
+<nav aria-label="Main navigation" class="fixed top-0 w-full z-50 border-b border-surface-800 bg-surface-950/80 backdrop-blur-md">
+	<div class="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
+		<a href="/" class="flex items-center">
+			<img src="/logo.png" alt="Chis webhook delivery service logo" class="h-8 invert" />
+		</a>
+		<div class="flex items-center gap-6">
+			<a href="/blog" class:list={["text-sm transition-colors", activePage === 'blog' ? 'text-white font-medium' : 'text-surface-400 hover:text-white']}>Blog</a>
+			<a href="/#features" class="text-sm text-surface-400 hover:text-white transition-colors">Features</a>
+			<a href="https://app.trychis.com" class="text-sm font-medium text-surface-950 bg-white rounded-md px-3.5 py-1.5 hover:bg-surface-200 transition-colors">Get Started</a>
+		</div>
+	</div>
+</nav>

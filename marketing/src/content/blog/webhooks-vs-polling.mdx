@@ -1,0 +1,191 @@
+---
+title: "Webhooks vs Polling: When to Use Each and Why It Matters"
+description: "Understand the trade-offs between webhooks and polling for real-time data. Learn when each approach is the right choice for your API integration."
+publishedDate: "2026-01-28"
+author: "Chis Team"
+tags: ["webhooks", "architecture", "API design"]
+keywords: ["webhooks vs polling", "push vs pull API", "webhook advantages", "when to use webhooks", "API polling", "real-time data"]
+featured: true
+draft: false
+---
+
+## The Two Models for Getting Data Between Systems
+
+Every time two systems need to share data in near-real-time, engineers face a fundamental architectural choice: should the consumer repeatedly ask for updates, or should the producer push updates when they happen? These two models, polling and webhooks, have different performance characteristics, different failure modes, and different operational costs. Choosing the wrong one can mean wasted bandwidth, stale data, or brittle integrations that break under load.
+
+## What Is Polling?
+
+Polling is the pull model. Your application sends HTTP requests to an API at regular intervals, asking "has anything changed since my last request?" The server responds with either new data or an empty response indicating nothing has changed.
+
+Here is a typical polling implementation:
+
+```javascript
+async function pollForUpdates(apiUrl, intervalMs = 5000) {
+  let lastChecked = new Date().toISOString();
+
+  setInterval(async () => {
+    try {
+      const res = await fetch(
+        `${apiUrl}/events?since=${lastChecked}`
+      );
+      const events = await res.json();
+
+      if (events.length > 0) {
+        lastChecked = new Date().toISOString();
+        for (const event of events) {
+          await processEvent(event);
+        }
+      }
+    } catch (err) {
+      console.error("Polling failed:", err);
+    }
+  }, intervalMs);
+}
+```
+
+Polling is conceptually simple. The consumer controls the timing, the flow, and the error handling. But simplicity comes at a cost.
+
+### The hidden cost of polling
+
+Consider an integration that polls every 5 seconds. That is 12 requests per minute, 720 per hour, and 17,280 per day, per endpoint. If you are integrating with 100 customers, you are sending 1.7 million requests per day. The vast majority of those requests return empty responses. You are burning compute, bandwidth, and API rate limits just to discover that nothing happened.
+
+Polling also introduces latency. If an event occurs 1 millisecond after your last poll, you will not discover it until the next interval fires. With a 5-second interval, your average latency is 2.5 seconds. With a 60-second interval, it climbs to 30 seconds. Reducing the interval improves freshness but multiplies the wasted requests.
+
+## What Are Webhooks?
+
+Webhooks are the push model. Instead of the consumer asking for updates, the producer sends an HTTP POST request to a pre-registered URL whenever an event occurs. The data arrives at the consumer's endpoint within milliseconds of the event, with no wasted requests in between.
+
+A minimal webhook receiver looks like this:
+
+```javascript
+import express from "express";
+
+const app = express();
+app.use(express.json());
+
+app.post("/webhooks/orders", (req, res) => {
+  const event = req.body;
+  console.log(`Received event: ${event.type}`, event.data);
+
+  // Acknowledge immediately, process asynchronously
+  res.status(200).send("OK");
+
+  processEventAsync(event).catch(console.error);
+});
+
+app.listen(3000);
+```
+
+And the equivalent in Python using FastAPI:
+
+```python
+from fastapi import FastAPI, Request, BackgroundTasks
+
+app = FastAPI()
+
+@app.post("/webhooks/orders")
+async def receive_webhook(
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    event = await request.json()
+    print(f"Received event: {event['type']}")
+
+    # Acknowledge immediately, process in background
+    background_tasks.add_task(process_event, event)
+    return {"status": "ok"}
+```
+
+The key pattern in both examples is acknowledging the webhook immediately with a `200` response, then processing the payload asynchronously. This prevents the sender's HTTP client from timing out while you run business logic.
+
+## Head-to-Head Comparison
+
+Here is how polling and webhooks compare across the dimensions that matter most in production:
+
+| Dimension           | Polling                                    | Webhooks                                  |
+|---------------------|--------------------------------------------|-------------------------------------------|
+| **Latency**         | Average of half the polling interval       | Near-instant (sub-second)                 |
+| **Server load**     | Constant, regardless of event frequency    | Proportional to event frequency           |
+| **Bandwidth**       | High (mostly empty responses)              | Low (only sends when data exists)         |
+| **Complexity**      | Simple to implement                        | Requires endpoint hosting and security    |
+| **Reliability**     | Inherently reliable (consumer controls)    | Requires retry logic on sender side       |
+| **Data freshness**  | Stale by design (delayed by interval)      | Real-time                                 |
+| **Scaling**         | Costs grow linearly with endpoints         | Costs grow with event volume              |
+| **Firewall/NAT**    | Works behind firewalls                     | Requires publicly accessible endpoint     |
+| **Ordering**        | Easy to maintain with cursors              | No guaranteed ordering                    |
+
+Neither approach wins on every dimension. The right choice depends on your constraints.
+
+## When Polling Is the Right Choice
+
+Polling has real advantages in specific scenarios, and dismissing it entirely is a mistake.
+
+### Behind firewalls or restrictive networks
+
+If the consumer cannot expose a public HTTP endpoint, polling is the only option. Many enterprise environments, healthcare systems, and government networks prohibit inbound connections. Polling works entirely through outbound requests, which most firewalls allow.
+
+### When the API does not support webhooks
+
+Not every API offers webhooks. If you need data from a service that only provides a REST API, polling is your only path. Wrapping this in a well-designed polling service with cursor-based pagination is straightforward and reliable.
+
+### Low-frequency data with no real-time requirements
+
+If you only need to sync data once an hour, a simple cron job that hits an API endpoint is dramatically simpler than setting up a webhook receiver, handling retries, and managing signature verification. Simplicity has operational value.
+
+### When ordering matters
+
+Polling with cursor-based pagination gives you strict ordering guarantees. You process events in sequence, advance the cursor, and never miss a record. Webhooks can arrive out of order, especially when retries are involved, so your handler must be idempotent and order-independent.
+
+## When Webhooks Win
+
+Webhooks are the better choice in the majority of modern integration scenarios.
+
+### Real-time requirements
+
+Payment confirmations, chat messages, deployment notifications, CI/CD triggers: any workflow where minutes of latency are unacceptable demands webhooks. A payment processor that takes 30 seconds to notify your system of a successful charge creates a terrible user experience.
+
+### High-volume, low-frequency-per-endpoint integrations
+
+If you have 10,000 customers but each one generates only a few events per day, polling all of them is wildly inefficient. Webhooks let you do zero work until an event occurs, then deliver it instantly.
+
+### Reducing API costs
+
+Many SaaS APIs charge per request or enforce rate limits. Polling consumes your quota even when there is nothing to fetch. Webhooks only generate traffic when real data exists, which can reduce your API costs by an order of magnitude.
+
+### Event-driven architectures
+
+If your system is built around event-driven patterns, message queues, or serverless functions, webhooks are the natural ingestion point. A webhook hits your endpoint, you drop the payload onto a queue, and your event pipeline takes over. Polling adds an unnecessary translation layer.
+
+## The Hybrid Approach
+
+The most robust integrations use both. Webhooks serve as the primary, real-time delivery channel. Polling serves as a fallback reconciliation mechanism.
+
+Here is how this works in practice:
+
+1. **Webhooks deliver events in real-time.** Your system processes them as they arrive and stores a record of each event ID.
+2. **A periodic polling job runs every 15 to 60 minutes.** It fetches recent events from the API and compares them against your stored records.
+3. **Any events found by polling that were not delivered by webhook are backfilled.** This catches deliveries lost to network issues, bugs, or downtime.
+
+```javascript
+// Reconciliation job (runs on a schedule)
+async function reconcile(apiUrl, lastReconciled) {
+  const res = await fetch(
+    `${apiUrl}/events?since=${lastReconciled}`
+  );
+  const events = await res.json();
+
+  for (const event of events) {
+    const exists = await eventStore.has(event.id);
+    if (!exists) {
+      console.log(`Backfilling missed event: ${event.id}`);
+      await processEvent(event);
+    }
+  }
+}
+```
+
+This hybrid pattern gives you the speed of webhooks and the reliability guarantee of polling, with minimal overhead.
+
+## Reliable Webhook Delivery with Chis
+
+Whether you are building a webhook producer or evaluating the hybrid approach, reliable delivery is the hard part. [Chis](https://trychis.com) is a webhook delivery service that handles the sending side: automatic retries with exponential backoff, delivery logging, payload inspection, and real-time monitoring. Instead of building and operating your own webhook infrastructure, you send events to Chis and it guarantees they reach your customers' endpoints. If a delivery fails, Chis retries it, logs the result, and gives you full visibility into every attempt. That lets you focus on your product instead of plumbing.

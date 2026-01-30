@@ -1,0 +1,287 @@
+---
+title: "How to Implement Webhooks: A Step-by-Step Guide for Developers"
+description: "A practical guide to implementing webhooks in your application. Covers sending webhooks, receiving webhooks, security, retries, and monitoring."
+publishedDate: "2026-01-26"
+author: "Chis Team"
+tags: ["webhooks", "tutorial", "implementation"]
+keywords: ["how to implement webhooks", "webhook implementation", "webhook tutorial", "send webhooks", "receive webhooks", "webhook guide"]
+featured: false
+draft: false
+---
+
+## What Is a Webhook?
+
+A webhook is an HTTP callback. When an event occurs in your application, you send an HTTP POST request to a URL that another system has registered. That system receives the payload, processes it, and responds with a status code to acknowledge receipt. The pattern is simple: event happens, HTTP request fires, data moves between systems in real time.
+
+Webhooks power the connective tissue of modern software. Stripe sends a webhook when a payment succeeds. GitHub sends one when code is pushed. Shopify fires webhooks when orders are placed. If you are building a SaaS product, there is a good chance your customers expect you to send webhooks.
+
+This guide walks through implementing webhooks from both sides: sending them from your application and receiving them in your consumer service.
+
+## Step 1: Design Your Event Payload
+
+A well-designed webhook payload makes integration easy for your consumers. Start with a consistent JSON structure that every event follows:
+
+```json
+{
+  "id": "evt_a1b2c3d4e5f6",
+  "type": "order.completed",
+  "created_at": "2026-01-26T14:30:00Z",
+  "idempotency_key": "idk_x7y8z9",
+  "data": {
+    "order_id": "ord_123456",
+    "total": 9999,
+    "currency": "usd",
+    "customer_email": "buyer@example.com"
+  }
+}
+```
+
+Several fields in this structure deserve attention:
+
+- **`id`**: A unique identifier for this specific event. Consumers use this to deduplicate deliveries.
+- **`type`**: A dot-separated string describing what happened. Use a `resource.action` naming convention like `order.completed`, `user.created`, or `invoice.payment_failed`. This lets consumers route events without parsing the payload.
+- **`created_at`**: An ISO 8601 timestamp of when the event occurred, not when the webhook was sent. This distinction matters for audit trails.
+- **`idempotency_key`**: An additional key consumers can use to ensure they only process the event once, even if it is delivered multiple times. This is critical because retries are a fact of life.
+- **`data`**: The event-specific payload. Nest it under a `data` key so the top-level envelope stays consistent across all event types.
+
+### Naming your event types
+
+Use a consistent, predictable naming scheme. The `resource.action` pattern is the industry standard:
+
+- `customer.created`
+- `customer.updated`
+- `payment.succeeded`
+- `payment.failed`
+- `subscription.canceled`
+
+Avoid vague names like `update` or `notification`. Your consumers need to write routing logic based on these strings, and specificity reduces bugs.
+
+## Step 2: Send the Webhook
+
+Sending a webhook means making an HTTP POST request to a URL your consumer has registered. Here is a basic implementation in Node.js:
+
+```javascript
+import crypto from "crypto";
+
+async function sendWebhook(endpoint, secret, event) {
+  const payload = JSON.stringify(event);
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+
+  // Generate HMAC signature
+  const signatureInput = `${timestamp}.${payload}`;
+  const signature = crypto
+    .createHmac("sha256", secret)
+    .update(signatureInput)
+    .digest("hex");
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Webhook-Signature": signature,
+      "X-Webhook-Timestamp": timestamp,
+    },
+    body: payload,
+    signal: AbortSignal.timeout(10_000), // 10 second timeout
+  });
+
+  return {
+    status: response.status,
+    success: response.ok,
+  };
+}
+```
+
+And in Python:
+
+```python
+import hmac
+import hashlib
+import time
+import httpx
+
+async def send_webhook(
+    endpoint: str,
+    secret: str,
+    event: dict,
+) -> dict:
+    import json
+    payload = json.dumps(event, separators=(",", ":"))
+    timestamp = str(int(time.time()))
+
+    # Generate HMAC signature
+    signature_input = f"{timestamp}.{payload}"
+    signature = hmac.new(
+        secret.encode(),
+        signature_input.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            endpoint,
+            content=payload,
+            headers={
+                "Content-Type": "application/json",
+                "X-Webhook-Signature": signature,
+                "X-Webhook-Timestamp": timestamp,
+            },
+            timeout=10.0,
+        )
+
+    return {
+        "status": response.status_code,
+        "success": response.is_success,
+    }
+```
+
+Key implementation details to note:
+
+- **Set a timeout.** Ten seconds is a reasonable default. Without a timeout, a slow or unresponsive consumer will tie up your resources indefinitely.
+- **Include a signature.** The HMAC-SHA256 signature lets the consumer verify that the payload came from you and was not tampered with. We cover this in depth in step 5.
+- **Include a timestamp.** The timestamp is used in signature generation and allows consumers to reject stale deliveries, preventing replay attacks.
+
+## Step 3: Handle Failures and Retries
+
+The first delivery attempt will fail more often than you expect. Implement exponential backoff with jitter:
+
+```javascript
+async function deliverWithRetry(endpoint, secret, event) {
+  const maxAttempts = 8;
+  const baseDelay = 1000; // 1 second
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const result = await sendWebhook(endpoint, secret, event);
+
+    if (result.success) {
+      return { delivered: true, attempts: attempt + 1 };
+    }
+
+    // Don't retry client errors (except 429 rate limit)
+    if (result.status >= 400 && result.status < 500 && result.status !== 429) {
+      return { delivered: false, attempts: attempt + 1, status: result.status };
+    }
+
+    // Exponential backoff with full jitter
+    const maxDelay = baseDelay * Math.pow(2, attempt);
+    const delay = Math.random() * maxDelay;
+    await new Promise((r) => setTimeout(r, delay));
+  }
+
+  // All retries exhausted — move to dead letter queue
+  await deadLetterQueue.add({ endpoint, event, attempts: maxAttempts });
+  return { delivered: false, attempts: maxAttempts };
+}
+```
+
+Do not retry `4xx` errors other than `429`. A `400 Bad Request` means your payload is malformed, and retrying will not fix it. A `401` or `403` means the consumer's authentication is misconfigured. Only transient errors, `5xx` responses, timeouts, and network failures, are worth retrying.
+
+## Step 4: Secure Your Webhooks with HMAC Signatures
+
+Webhook endpoints are public URLs. Without verification, anyone who discovers the URL can send fake payloads. HMAC signatures solve this.
+
+The pattern works like this:
+
+1. You and the consumer share a secret key during registration.
+2. When sending a webhook, you compute an HMAC-SHA256 hash of the timestamp concatenated with the payload, using the shared secret.
+3. You include the hash in a header.
+4. The consumer computes the same hash using their copy of the secret and compares it to the header value.
+5. If they match, the payload is authentic and unmodified.
+
+The signature generation code is already included in the send functions above. Here is the verification side in Node.js:
+
+```javascript
+import crypto from "crypto";
+
+function verifyWebhookSignature(payload, signature, timestamp, secret) {
+  // Reject requests older than 5 minutes
+  const currentTime = Math.floor(Date.now() / 1000);
+  if (Math.abs(currentTime - parseInt(timestamp)) > 300) {
+    return false;
+  }
+
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(`${timestamp}.${payload}`)
+    .digest("hex");
+
+  // Constant-time comparison to prevent timing attacks
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expected)
+  );
+}
+```
+
+Always use constant-time comparison. A naive `===` string comparison leaks timing information that attackers can exploit to guess the signature one character at a time.
+
+## Step 5: Receiving Webhooks
+
+When building a webhook consumer, there are three rules that matter above all others.
+
+### Respond fast
+
+Return a `200` status code as quickly as possible. The sender is waiting for your response, and if you take too long, they will time out and retry. Acknowledge receipt immediately and process the payload asynchronously:
+
+```javascript
+app.post("/webhooks", (req, res) => {
+  const rawBody = req.body;
+
+  const isValid = verifyWebhookSignature(
+    JSON.stringify(rawBody),
+    req.headers["x-webhook-signature"],
+    req.headers["x-webhook-timestamp"],
+    process.env.WEBHOOK_SECRET
+  );
+
+  if (!isValid) {
+    return res.status(401).send("Invalid signature");
+  }
+
+  // Acknowledge immediately
+  res.status(200).send("OK");
+
+  // Process asynchronously
+  queue.add("process-webhook", rawBody);
+});
+```
+
+### Be idempotent
+
+You will receive the same event more than once. Retries, network glitches, and at-least-once delivery guarantees all cause duplicates. Use the event `id` or `idempotency_key` to check if you have already processed the event before acting on it:
+
+```javascript
+async function processWebhook(event) {
+  const alreadyProcessed = await db.webhookEvents.findOne({
+    eventId: event.id,
+  });
+
+  if (alreadyProcessed) {
+    console.log(`Skipping duplicate event: ${event.id}`);
+    return;
+  }
+
+  await db.webhookEvents.create({ eventId: event.id, processedAt: new Date() });
+
+  // Your business logic here
+  await handleEvent(event);
+}
+```
+
+### Verify the signature
+
+Never process an unverified webhook. Always check the HMAC signature before touching the payload. This is your primary defense against spoofed events.
+
+## Common Pitfalls
+
+Even experienced teams make these mistakes when implementing webhooks:
+
+- **Doing heavy work in the request handler.** If your webhook handler runs database migrations, sends emails, or calls third-party APIs before responding, you will time out. Respond with `200` first. Always.
+- **Not logging delivery attempts.** Without logs, debugging failed deliveries becomes guesswork. Record every attempt with the status code, response body, and latency.
+- **Ignoring payload size.** Enforce a maximum payload size on your receiver (typically 256 KB to 1 MB). Without limits, a malicious or buggy sender can exhaust your server's memory.
+- **Hardcoding event types.** New event types will be added over time. If your router throws an error on unrecognized types instead of ignoring them, a new event type from the sender will break your integration.
+- **Forgetting to handle redeliveries.** When a sender replays events from their dashboard or dead letter queue, your system should handle them gracefully. Idempotency is not optional.
+
+## Simplify Webhook Delivery with Chis
+
+Implementing webhook sending, retries, signing, logging, and monitoring is a substantial engineering effort. [Chis](https://trychis.com) provides all of this as a service. You send events to the Chis API, and it handles delivery to your customers' endpoints with automatic retries, HMAC signing, and a real-time dashboard for monitoring every delivery attempt. Instead of building and maintaining webhook infrastructure, you can ship your product and let Chis handle the plumbing.

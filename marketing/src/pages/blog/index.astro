@@ -1,0 +1,74 @@
+---
+import Layout from '../../layouts/main.astro';
+import Nav from '../../components/Nav.astro';
+import Footer from '../../components/Footer.astro';
+import { getCollection } from 'astro:content';
+
+const posts = (await getCollection('blog', ({ data }) => !data.draft))
+	.sort((a, b) => new Date(b.data.publishedDate).valueOf() - new Date(a.data.publishedDate).valueOf());
+
+const blogJsonLd = {
+	"@context": "https://schema.org",
+	"@type": "Blog",
+	"name": "Chis Blog",
+	"description": "Guides, tutorials, and best practices for webhook delivery, event-driven architecture, and API integration.",
+	"url": "https://trychis.com/blog",
+	"publisher": {
+		"@type": "Organization",
+		"name": "Chis",
+		"url": "https://trychis.com",
+	},
+};
+---
+
+<Layout
+	title="Blog | Chis - Webhook Delivery Guides & Best Practices"
+	description="Learn about webhook delivery, retry strategies, event-driven architecture, and API best practices. Guides written for developers by developers."
+	keywords={["webhook blog", "webhook guides", "webhook best practices", "event-driven architecture", "API integration"]}
+>
+	<Nav activePage="blog" />
+
+	<main class="pt-24 pb-20 px-6">
+		<div class="max-w-3xl mx-auto">
+			<header class="mb-12">
+				<h1 class="text-3xl sm:text-4xl font-bold text-white tracking-tight">Blog</h1>
+				<p class="mt-3 text-lg text-surface-400">
+					Guides, tutorials, and insights on webhook delivery and event-driven architecture.
+				</p>
+			</header>
+
+			<div class="space-y-8">
+				{posts.map((post) => (
+					<article class="group">
+						<a href={`/blog/${post.id}`} class="block rounded-xl border border-surface-800 bg-surface-900 p-6 hover:border-surface-700 transition-colors">
+							<div class="flex flex-wrap gap-2 mb-3">
+								{post.data.tags.slice(0, 3).map((tag) => (
+									<span class="px-2 py-0.5 text-xs font-medium text-brand-400 bg-brand-500/10 border border-brand-500/20 rounded-full">
+										{tag}
+									</span>
+								))}
+							</div>
+							<h2 class="text-xl font-bold text-white group-hover:text-brand-400 transition-colors">
+								{post.data.title}
+							</h2>
+							<p class="mt-2 text-sm text-surface-400 leading-relaxed">
+								{post.data.description}
+							</p>
+							<div class="mt-4 flex items-center gap-3 text-xs text-surface-500">
+								<span>{post.data.author}</span>
+								<span>&middot;</span>
+								<time datetime={post.data.publishedDate}>
+									{new Date(post.data.publishedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+								</time>
+							</div>
+						</a>
+					</article>
+				))}
+			</div>
+		</div>
+	</main>
+
+	<Footer />
+
+	<script type="application/ld+json" set:html={JSON.stringify(blogJsonLd)} />
+</Layout>

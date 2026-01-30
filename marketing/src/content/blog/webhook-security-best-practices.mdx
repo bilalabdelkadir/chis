@@ -1,0 +1,303 @@
+---
+title: "Webhook Security Best Practices: Signatures, Verification, and HMAC"
+description: "Protect your webhook endpoints with HMAC-SHA256 signatures, timestamp validation, and IP allowlisting. Code examples for verifying webhook signatures."
+publishedDate: "2026-01-24"
+author: "Chis Team"
+tags: ["webhooks", "security", "HMAC"]
+keywords: ["webhook security", "webhook signature verification", "HMAC webhook", "webhook HMAC-SHA256", "secure webhook endpoint", "webhook authentication"]
+featured: false
+draft: false
+---
+
+## Why Webhook Security Matters
+
+A webhook endpoint is a public URL that accepts HTTP POST requests. If you publish a webhook endpoint at `https://api.yourapp.com/webhooks/payments`, anyone on the internet can send a request to it. Without verification, your application has no way to distinguish a legitimate payload from Stripe from a forged one sent by an attacker.
+
+The consequences of processing unverified webhooks range from annoying to catastrophic:
+
+- **Spoofed payloads.** An attacker sends a fake `payment.succeeded` event. Your application marks an order as paid and ships the product. The attacker gets the goods without paying.
+- **Data corruption.** A forged `customer.updated` event overwrites real customer data with malicious values.
+- **Replay attacks.** An attacker intercepts a legitimate webhook and resends it hours or days later to trigger duplicate processing, such as issuing a refund twice.
+- **Denial of service.** A flood of fake webhook payloads overwhelms your processing pipeline and degrades your service.
+
+Webhook security is not an optional hardening step. It is a requirement for any production system that acts on incoming webhook data.
+
+## HMAC-SHA256 Signatures: How They Work
+
+HMAC (Hash-based Message Authentication Code) is the standard mechanism for authenticating webhooks. The concept is straightforward:
+
+1. The webhook sender and receiver share a secret key. This happens once during setup, typically when the consumer registers their endpoint URL.
+2. When the sender fires a webhook, it computes a hash of the payload using the shared secret. This hash is the signature.
+3. The sender includes the signature in an HTTP header alongside the payload.
+4. The receiver computes the same hash using its copy of the secret and the received payload.
+5. If the computed hash matches the header value, the payload is authentic and has not been tampered with. If it does not match, the payload is rejected.
+
+The security depends on the secret. Only the sender and receiver know it. An attacker who intercepts the payload cannot forge a valid signature without the secret, and they cannot derive the secret from the signature because HMAC is a one-way function.
+
+HMAC-SHA256 is the industry standard. SHA256 produces a 256-bit hash that is computationally infeasible to forge. Stripe, GitHub, Shopify, and most major SaaS platforms use this algorithm.
+
+## Implementing Signature Generation (Sender Side)
+
+When you send a webhook, you need to compute the signature and attach it to the request. The best practice is to include a timestamp in the signed content to enable replay protection on the receiver side.
+
+### Node.js
+
+```javascript
+import crypto from "crypto";
+
+function signWebhookPayload(payload, secret, timestamp) {
+  const signedContent = `${timestamp}.${payload}`;
+  return crypto
+    .createHmac("sha256", secret)
+    .update(signedContent)
+    .digest("hex");
+}
+
+async function sendSignedWebhook(url, secret, event) {
+  const payload = JSON.stringify(event);
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const signature = signWebhookPayload(payload, secret, timestamp);
+
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Webhook-Signature": signature,
+      "X-Webhook-Timestamp": timestamp,
+      "X-Webhook-Id": event.id,
+    },
+    body: payload,
+    signal: AbortSignal.timeout(10_000),
+  });
+}
+```
+
+### Python
+
+```python
+import hmac
+import hashlib
+import json
+import time
+import httpx
+
+def sign_webhook_payload(
+    payload: str,
+    secret: str,
+    timestamp: str,
+) -> str:
+    signed_content = f"{timestamp}.{payload}"
+    return hmac.new(
+        secret.encode("utf-8"),
+        signed_content.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+async def send_signed_webhook(
+    url: str,
+    secret: str,
+    event: dict,
+) -> httpx.Response:
+    payload = json.dumps(event, separators=(",", ":"))
+    timestamp = str(int(time.time()))
+    signature = sign_webhook_payload(payload, secret, timestamp)
+
+    async with httpx.AsyncClient() as client:
+        return await client.post(
+            url,
+            content=payload,
+            headers={
+                "Content-Type": "application/json",
+                "X-Webhook-Signature": signature,
+                "X-Webhook-Timestamp": timestamp,
+                "X-Webhook-Id": event["id"],
+            },
+            timeout=10.0,
+        )
+```
+
+Note the signature format: the timestamp and payload are concatenated with a period separator before hashing. This binds the timestamp to the payload so that an attacker cannot swap timestamps between different payloads.
+
+## Implementing Signature Verification (Receiver Side)
+
+The receiver must verify the signature before processing the payload. There are two critical implementation details that many teams get wrong.
+
+### Node.js
+
+```javascript
+import crypto from "crypto";
+
+function verifyWebhookSignature(req, secret) {
+  const signature = req.headers["x-webhook-signature"];
+  const timestamp = req.headers["x-webhook-timestamp"];
+  const payload = req.rawBody; // Must be the raw body string, not parsed JSON
+
+  if (!signature || !timestamp || !payload) {
+    return { valid: false, reason: "Missing signature headers" };
+  }
+
+  // 1. Check timestamp freshness (reject if older than 5 minutes)
+  const currentTime = Math.floor(Date.now() / 1000);
+  const webhookTime = parseInt(timestamp, 10);
+  const tolerance = 300; // 5 minutes in seconds
+
+  if (Math.abs(currentTime - webhookTime) > tolerance) {
+    return { valid: false, reason: "Timestamp too old" };
+  }
+
+  // 2. Compute expected signature
+  const signedContent = `${timestamp}.${payload}`;
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(signedContent)
+    .digest("hex");
+
+  // 3. Constant-time comparison
+  const isValid = crypto.timingSafeEqual(
+    Buffer.from(signature, "utf-8"),
+    Buffer.from(expected, "utf-8")
+  );
+
+  return { valid: isValid, reason: isValid ? "OK" : "Signature mismatch" };
+}
+```
+
+### Python
+
+```python
+import hmac
+import hashlib
+import time
+
+def verify_webhook_signature(
+    raw_body: bytes,
+    signature: str,
+    timestamp: str,
+    secret: str,
+    tolerance_seconds: int = 300,
+) -> tuple[bool, str]:
+    # 1. Check timestamp freshness
+    try:
+        webhook_time = int(timestamp)
+    except (ValueError, TypeError):
+        return False, "Invalid timestamp"
+
+    current_time = int(time.time())
+    if abs(current_time - webhook_time) > tolerance_seconds:
+        return False, "Timestamp too old"
+
+    # 2. Compute expected signature
+    signed_content = f"{timestamp}.{raw_body.decode('utf-8')}"
+    expected = hmac.new(
+        secret.encode("utf-8"),
+        signed_content.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+
+    # 3. Constant-time comparison
+    is_valid = hmac.compare_digest(signature, expected)
+    reason = "OK" if is_valid else "Signature mismatch"
+    return is_valid, reason
+```
+
+### Two details that matter
+
+**Use the raw body, not parsed JSON.** If your framework parses the JSON body and you re-serialize it for verification, whitespace or key ordering differences will change the string and the signature will not match. Always compute the signature against the exact bytes that arrived over the wire.
+
+In Express, you can capture the raw body with middleware:
+
+```javascript
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      req.rawBody = buf.toString("utf-8");
+    },
+  })
+);
+```
+
+**Use constant-time comparison.** A standard `===` comparison in JavaScript or `==` in Python returns `false` at the first mismatched character. An attacker can measure the response time to determine how many leading characters of their forged signature are correct, then iterate to discover the full signature. `crypto.timingSafeEqual` in Node.js and `hmac.compare_digest` in Python always take the same amount of time regardless of where the strings differ.
+
+## Timestamp Validation to Prevent Replay Attacks
+
+The timestamp check shown in the verification code above is your defense against replay attacks. Without it, an attacker who captures a valid webhook can resend it indefinitely, and the signature will still be valid because the payload has not changed.
+
+By including the timestamp in the signed content and rejecting payloads older than a tolerance window (typically 5 minutes), you ensure that:
+
+- Captured webhooks expire quickly and cannot be replayed after the window closes.
+- The attacker cannot alter the timestamp without invalidating the signature, because the timestamp is part of the signed content.
+
+Five minutes is a reasonable default tolerance. It is long enough to account for clock drift and network latency, but short enough to limit the replay window.
+
+If your application requires even stronger replay protection, store the webhook `id` from each processed event and reject duplicates:
+
+```javascript
+async function handleWebhook(req, res) {
+  const { valid, reason } = verifyWebhookSignature(req, process.env.WEBHOOK_SECRET);
+  if (!valid) {
+    return res.status(401).json({ error: reason });
+  }
+
+  const event = JSON.parse(req.rawBody);
+
+  // Reject duplicate deliveries
+  const alreadySeen = await db.processedWebhooks.findOne({ eventId: event.id });
+  if (alreadySeen) {
+    return res.status(200).json({ status: "already_processed" });
+  }
+
+  await db.processedWebhooks.create({
+    eventId: event.id,
+    receivedAt: new Date(),
+  });
+
+  res.status(200).json({ status: "accepted" });
+  queue.add("process-event", event);
+}
+```
+
+This combines signature verification, timestamp validation, and idempotency into a robust ingestion pipeline.
+
+## Additional Security Measures
+
+HMAC signatures and timestamp validation are the foundation, but there are additional layers worth considering.
+
+### HTTPS only
+
+Never accept webhooks over plain HTTP. HTTPS encrypts the payload in transit, preventing eavesdropping. If a consumer registers an `http://` endpoint, reject it or issue a warning. The shared secret and payload contents are exposed on unencrypted connections.
+
+### IP allowlisting
+
+If your webhook sender uses a known set of IP addresses, you can restrict your endpoint to only accept requests from those IPs. This adds a network-layer defense that operates independently of signature verification.
+
+```javascript
+const ALLOWED_IPS = new Set([
+  "203.0.113.10",
+  "203.0.113.11",
+  "198.51.100.0/24",
+]);
+
+function checkIPAllowlist(req) {
+  const clientIP = req.headers["x-forwarded-for"]?.split(",")[0]?.trim()
+    || req.socket.remoteAddress;
+  return ALLOWED_IPS.has(clientIP);
+}
+```
+
+Be cautious with IP allowlisting as a sole defense. IP addresses can be spoofed, infrastructure changes can break the allowlist, and cloud providers rotate IPs. Use it as defense in depth alongside HMAC verification, never as a replacement.
+
+### Request size limits
+
+Enforce a maximum payload size on your webhook endpoint. Without limits, an attacker (or a buggy sender) could post a multi-gigabyte payload and exhaust your server's memory. A 1 MB limit is generous for almost any webhook use case:
+
+```javascript
+app.use(express.json({ limit: "1mb" }));
+```
+
+### Secret rotation
+
+Webhook secrets should be rotatable without downtime. The standard approach is to support two active secrets simultaneously during rotation: the old secret and the new one. The receiver tries both secrets when verifying, and once the sender has switched to the new secret, the old one is deactivated.
+
+## Built-In Security with Chis
+
+Implementing HMAC signing, timestamp validation, and secure delivery correctly requires careful attention to detail, and getting it wrong means your customers are vulnerable. [Chis](https://trychis.com) handles webhook security out of the box. Every webhook sent through Chis is signed with HMAC-SHA256, includes a timestamp for replay protection, and is delivered exclusively over HTTPS. Your customers get verification SDKs and documentation, and you get a security model that works without building it from scratch.

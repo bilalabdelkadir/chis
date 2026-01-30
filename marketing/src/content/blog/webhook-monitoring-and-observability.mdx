@@ -1,0 +1,217 @@
+---
+title: "Webhook Monitoring and Observability: Debug Delivery Failures Fast"
+description: "Set up webhook monitoring with delivery logs, alerting, and dashboards. Learn to quickly diagnose and fix webhook delivery failures in production."
+publishedDate: "2026-01-22"
+author: "Chis Team"
+tags: ["webhooks", "monitoring", "observability"]
+keywords: ["webhook monitoring", "webhook observability", "webhook debugging", "webhook delivery logs", "webhook dashboard", "webhook alerting"]
+featured: false
+draft: false
+---
+
+## The Invisible Failure Problem
+
+Webhooks fail silently. Unlike a user-facing API where someone immediately notices a broken page, a failed webhook delivery can go undetected for hours or even days. A payment provider sends a `payment.completed` event, your endpoint returns a 500, the provider retries a few times, gives up, and nobody on your team knows the customer's order was never fulfilled.
+
+This is the fundamental challenge of webhook infrastructure: the failure mode is silence. Without proper monitoring and observability, you are flying blind. In this guide, we will walk through everything you need to build a robust webhook monitoring system -- from what to log on every delivery attempt to setting up alerts that catch problems before your customers do.
+
+## What to Log for Every Delivery Attempt
+
+The foundation of webhook observability is comprehensive delivery logging. Every single attempt -- not just the final outcome -- should produce a structured log record. Here is what to capture:
+
+```json
+{
+  "delivery_id": "del_8f3a2b1c",
+  "event_id": "evt_4e7d9a0f",
+  "event_type": "invoice.paid",
+  "endpoint_url": "https://api.customer.com/webhooks",
+  "attempt_number": 2,
+  "timestamp": "2026-01-22T14:32:01.442Z",
+  "request": {
+    "method": "POST",
+    "headers": {
+      "Content-Type": "application/json",
+      "X-Webhook-Signature": "sha256=abc123..."
+    },
+    "body_size_bytes": 1482
+  },
+  "response": {
+    "status_code": 503,
+    "headers": {
+      "Retry-After": "30"
+    },
+    "body_preview": "Service temporarily unavailable",
+    "body_size_bytes": 34
+  },
+  "latency_ms": 2340,
+  "error": null,
+  "tls_version": "TLSv1.3",
+  "ip_address": "203.0.113.42"
+}
+```
+
+A few things worth calling out:
+
+- **Attempt number** is critical. Knowing that an endpoint consistently fails on the first attempt but succeeds on the second points to a cold-start or scaling issue on the consumer side.
+- **Response body preview** is invaluable for debugging. A 400 status code alone tells you nothing; the response body saying `"invalid signature"` immediately tells you the consumer's verification logic is broken.
+- **Latency** per attempt helps identify endpoints that are close to timing out, even if they technically succeed.
+- **Store the request body size**, not the full body, in your log index. Keep the full payload accessible but do not bloat your log storage.
+
+## Key Metrics to Track
+
+Raw logs are the foundation, but you need aggregated metrics to understand system health at a glance. These are the metrics that matter most for webhook delivery:
+
+### Delivery Success Rate
+
+The single most important metric. Calculate it as `(successful deliveries / total final outcomes) * 100` over a rolling window. A healthy webhook system should maintain a success rate above 99%. Track this both globally and per-endpoint.
+
+### Average and p99 Latency
+
+Average latency tells you the general story. The 99th percentile tells you about the worst experiences. If your p99 is 25 seconds but your timeout is 30, you are uncomfortably close to widespread failures.
+
+### Retry Rate
+
+`(deliveries requiring retries / total deliveries) * 100`. A high retry rate -- even if the final success rate is fine -- means your system is doing more work than it should. It often signals that a specific consumer endpoint is unhealthy.
+
+### Dead Letter Rate
+
+Events that exhaust all retry attempts and land in the dead letter queue. This should be as close to zero as possible. Any non-zero trend here demands investigation.
+
+### Queue Depth Over Time
+
+How many events are waiting to be delivered. A growing queue depth means your workers cannot keep up with the inbound event rate.
+
+## Setting Up Alerts
+
+Metrics without alerts are just dashboards nobody looks at. Here are the alerts you should configure and the thresholds to start with:
+
+```yaml
+alerts:
+  - name: delivery_success_rate_drop
+    condition: success_rate < 95%
+    window: 15m
+    severity: critical
+    description: "Overall webhook delivery success rate dropped below 95%"
+
+  - name: endpoint_failure_spike
+    condition: endpoint_failure_rate > 50%
+    window: 10m
+    severity: warning
+    description: "Individual endpoint failing more than half of deliveries"
+
+  - name: dead_letter_queue_growing
+    condition: dlq_size_increase > 100
+    window: 1h
+    severity: critical
+    description: "Dead letter queue grew by more than 100 events in the last hour"
+
+  - name: delivery_latency_spike
+    condition: p99_latency > 20s
+    window: 5m
+    severity: warning
+    description: "99th percentile delivery latency exceeding 20 seconds"
+
+  - name: queue_depth_high
+    condition: queue_depth > 10000
+    window: 5m
+    severity: warning
+    description: "Delivery queue depth exceeding 10,000 pending events"
+```
+
+Start with these thresholds and tune them based on your traffic patterns. The goal is to catch real problems without creating alert fatigue.
+
+## Building a Webhook Dashboard
+
+A well-designed dashboard lets your team answer the question "what is going wrong and where?" in under 30 seconds. Here is what to include:
+
+### Overview Panel
+
+Display the current delivery success rate as a large number with a sparkline showing the last 24 hours. Add total deliveries, active endpoints, and current queue depth.
+
+### Delivery Timeline
+
+A time-series chart showing successful, failed, and retrying deliveries over the selected time range. This immediately surfaces spikes in failures.
+
+### Endpoint Health Table
+
+A sortable table listing each registered endpoint with its current success rate, average latency, total deliveries, and last failure reason. Sort by success rate ascending to put the most problematic endpoints at the top.
+
+### Filtering and Search
+
+Allow filtering by:
+
+- **Status**: succeeded, failed, retrying, dead-lettered
+- **Endpoint URL**: specific consumer endpoints
+- **Event type**: narrow down to specific event categories
+- **Time range**: last hour, last 24 hours, last 7 days, custom
+
+### Delivery Detail View
+
+Clicking on any delivery should show the full timeline of every attempt, including the request headers, response status, response body, and latency for each try.
+
+## Debugging Common Failures
+
+When your alerts fire, you need to diagnose fast. Here are the most common webhook delivery failures and how to resolve them:
+
+### Timeouts
+
+**Symptoms**: Delivery latency equal to your timeout threshold, no response status code recorded.
+
+**Common causes**: The consumer endpoint is doing too much synchronous work (processing the event inline instead of queuing it), the consumer is under heavy load, or network latency between regions is high.
+
+**Fix**: Advise consumers to return 200 immediately and process asynchronously. Consider whether your timeout is reasonable -- 30 seconds is a common default.
+
+### 5xx Errors
+
+**Symptoms**: Response status codes in the 500-599 range, often intermittent.
+
+**Common causes**: Consumer application crashes, deployment in progress, database connection exhaustion, or out-of-memory conditions.
+
+**Fix**: These are typically transient. Your retry mechanism should handle them. If a specific endpoint returns 5xx consistently, reach out to the consumer team.
+
+### DNS Resolution Failures
+
+**Symptoms**: Connection error with no status code, error message referencing DNS.
+
+**Common causes**: The endpoint domain no longer exists, DNS propagation issues after a domain change, or DNS resolver rate limiting.
+
+**Fix**: Verify the endpoint URL is correct. Check if the domain resolves from your infrastructure. Consider caching DNS results with a reasonable TTL.
+
+### TLS/SSL Errors
+
+**Symptoms**: Connection error referencing certificate validation, handshake failure, or protocol mismatch.
+
+**Common causes**: Expired SSL certificate on the consumer side, self-signed certificates, or the consumer only supports outdated TLS versions.
+
+**Fix**: Notify the consumer about their certificate issue. Never disable TLS verification as a workaround -- it defeats the security purpose of HTTPS.
+
+```go
+// Example: structured error classification for delivery failures
+func classifyError(err error, statusCode int) string {
+    if err != nil {
+        if isTimeout(err) {
+            return "timeout"
+        }
+        if isDNSError(err) {
+            return "dns_failure"
+        }
+        if isTLSError(err) {
+            return "tls_error"
+        }
+        return "connection_error"
+    }
+    if statusCode >= 500 {
+        return "server_error"
+    }
+    if statusCode >= 400 {
+        return "client_error"
+    }
+    return "success"
+}
+```
+
+Classifying errors programmatically lets you aggregate failure reasons in your dashboard and quickly identify patterns.
+
+## How Chis Handles Webhook Observability
+
+Building a complete monitoring and observability stack for webhooks is a significant engineering investment. [Chis](https://trychis.com) provides all of this out of the box: every delivery attempt is logged with full request and response details, a real-time dashboard shows delivery health across all your endpoints, and you can drill into any individual delivery to see the complete timeline of attempts. Instead of building and maintaining your own logging pipeline, alerting rules, and dashboard, you get production-grade webhook observability from day one.

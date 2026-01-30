@@ -1,0 +1,212 @@
+---
+title: "Webhook Retry Strategies: A Complete Guide to Exponential Backoff"
+description: "Learn how to implement reliable webhook retry logic with exponential backoff, jitter, and dead letter queues. Practical examples and best practices."
+publishedDate: "2026-01-30"
+author: "Chis Team"
+tags: ["webhooks", "reliability", "retries"]
+keywords: ["webhook retry strategy", "exponential backoff", "webhook retry logic", "webhook backoff", "dead letter queue", "webhook reliability"]
+featured: true
+draft: false
+---
+
+## Why Webhooks Fail
+
+Webhooks are HTTP requests fired from one system to another when an event occurs. They are inherently unreliable because they depend on the network, the receiving server, and everything in between. Understanding why webhooks fail is the first step toward building a resilient delivery system.
+
+The most common failure modes include:
+
+- **Network issues.** Transient DNS failures, packet loss, and broken routes can prevent the request from ever reaching the destination.
+- **Server downtime.** The receiving server might be deploying, scaling, or simply crashed. A `503 Service Unavailable` is the telltale sign.
+- **Rate limits.** The consumer's infrastructure may enforce rate limits, returning `429 Too Many Requests` when you send too fast.
+- **Timeouts.** If the receiver takes too long to respond, your HTTP client will time out and treat the delivery as failed, even if the receiver eventually processed it.
+- **Application errors.** A bug in the consumer's webhook handler can return a `500 Internal Server Error` that has nothing to do with your payload.
+
+Every webhook delivery system must account for these failures. The question is not *if* deliveries will fail, but *how* your system recovers when they do.
+
+## The Naive Approach and Why It Breaks
+
+The simplest retry strategy is to immediately retry a failed request in a tight loop:
+
+```javascript
+// Don't do this
+async function sendWebhook(url, payload, maxRetries = 5) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) return;
+  }
+  throw new Error("Webhook delivery failed after max retries");
+}
+```
+
+This approach has several serious problems. First, if the server is down, hammering it with five requests in rapid succession accomplishes nothing except adding load to an already struggling system. Second, if thousands of webhooks fail at the same time, say during a brief network partition, they all retry simultaneously. This creates a **thundering herd** that can overwhelm the receiver the moment it comes back online, causing a cascading failure. Third, this blocks the calling thread for the entire retry sequence, reducing your system's throughput.
+
+Immediate retries are worse than no retries at all because they amplify failure instead of absorbing it.
+
+## Exponential Backoff Explained
+
+Exponential backoff is the standard solution. Instead of retrying immediately, you wait longer between each successive attempt. The delay grows exponentially, giving the failing system time to recover.
+
+The formula is straightforward:
+
+```
+delay = baseDelay * 2^attempt
+```
+
+Here is a practical implementation in JavaScript:
+
+```javascript
+async function sendWebhookWithBackoff(url, payload, maxRetries = 8) {
+  const baseDelay = 1000; // 1 second
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) return { success: true, attempt };
+
+      // Don't retry on 4xx client errors (except 429)
+      if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+        return { success: false, status: res.status, attempt };
+      }
+    } catch (err) {
+      // Network error, will retry
+    }
+
+    const delay = baseDelay * Math.pow(2, attempt);
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+
+  return { success: false, attempt: maxRetries };
+}
+```
+
+And the equivalent in Python:
+
+```python
+import httpx
+import asyncio
+
+async def send_webhook_with_backoff(
+    url: str,
+    payload: dict,
+    max_retries: int = 8,
+    base_delay: float = 1.0,
+) -> dict:
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, json=payload, timeout=10)
+
+            if response.is_success:
+                return {"success": True, "attempt": attempt}
+
+            # Don't retry client errors (except 429)
+            if 400 <= response.status_code < 500 and response.status_code != 429:
+                return {"success": False, "status": response.status_code}
+
+        except httpx.RequestError:
+            pass  # Network error, will retry
+
+        delay = base_delay * (2 ** attempt)
+        await asyncio.sleep(delay)
+
+    return {"success": False, "attempt": max_retries}
+```
+
+Notice that both implementations skip retries for `4xx` client errors (except `429`). A `400 Bad Request` or `401 Unauthorized` will not succeed no matter how many times you retry. Only transient failures, those `5xx` server errors, timeouts, and network errors, are worth retrying.
+
+## Adding Jitter to Prevent Thundering Herds
+
+Pure exponential backoff has a subtle problem. If a thousand webhooks all fail at the same moment, they will all retry at the exact same intervals: 1 second, 2 seconds, 4 seconds, and so on. The retries are synchronized, and the thundering herd reappears at each backoff interval.
+
+**Jitter** solves this by adding randomness to the delay. There are two common approaches:
+
+**Full jitter** randomizes the entire delay:
+
+```javascript
+const delay = Math.random() * baseDelay * Math.pow(2, attempt);
+```
+
+**Equal jitter** uses half the calculated delay as a floor, then randomizes the other half:
+
+```javascript
+const halfDelay = (baseDelay * Math.pow(2, attempt)) / 2;
+const delay = halfDelay + Math.random() * halfDelay;
+```
+
+Full jitter produces the best distribution for reducing correlated retries. AWS published research on this in their architecture blog, and full jitter consistently outperforms both no-jitter and equal-jitter strategies in terms of total work and completion time.
+
+Here is the updated retry function with full jitter:
+
+```javascript
+async function sendWebhookWithJitter(url, payload, maxRetries = 8) {
+  const baseDelay = 1000;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) return { success: true, attempt };
+      if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+        return { success: false, status: res.status };
+      }
+    } catch (err) {
+      // Network error, will retry
+    }
+
+    const maxDelay = baseDelay * Math.pow(2, attempt);
+    const delay = Math.random() * maxDelay;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+  }
+
+  return { success: false, attempt: maxRetries };
+}
+```
+
+## Setting Max Attempts and Dead Letter Queues
+
+Every retry strategy needs a ceiling. Without one, a permanently broken endpoint will consume resources indefinitely. A common configuration is 8 attempts with exponential backoff capped at a maximum delay of around 1 hour. This gives the receiving system several hours to recover.
+
+After all retries are exhausted, the webhook enters a **dead letter queue** (DLQ). A dead letter queue stores failed deliveries for later inspection and manual or automated reprocessing. A well-designed DLQ should capture:
+
+- The original payload
+- The destination URL
+- The HTTP status code or error from the last attempt
+- The total number of attempts
+- Timestamps for each attempt
+
+This data allows operators to diagnose failures, fix the underlying issue, and replay the failed webhooks.
+
+## Real-World Retry Schedule
+
+Here is what a typical exponential backoff schedule looks like with a 1-second base delay and 8 maximum attempts:
+
+| Attempt | Delay          | Total Elapsed    |
+|---------|----------------|------------------|
+| 1       | 1 second       | 1 second         |
+| 2       | 2 seconds      | 3 seconds        |
+| 3       | 4 seconds      | 7 seconds        |
+| 4       | 8 seconds      | 15 seconds       |
+| 5       | 16 seconds     | 31 seconds       |
+| 6       | 32 seconds     | ~1 minute        |
+| 7       | 64 seconds     | ~2 minutes       |
+| 8       | 128 seconds    | ~4.5 minutes     |
+
+For production systems that need longer windows, use larger base delays. A 30-second base delay with 10 attempts stretches the total retry window to over 8 hours, giving operations teams time to respond to incidents before webhooks are permanently failed.
+
+With jitter applied, these delays become ranges rather than fixed values, which spreads the load and prevents retry storms.
+
+## How Chis Handles Retries Automatically
+
+Building a robust retry system with exponential backoff, jitter, dead letter queues, and configurable retry policies is a significant engineering investment. [Chis](https://trychis.com) handles all of this out of the box. Every webhook you send through Chis is automatically retried with exponential backoff and jitter. Failed deliveries land in a dashboard where you can inspect payloads, see error details, and replay individual events or entire batches with a single click. You get the reliability of a battle-tested retry engine without writing or maintaining any of the infrastructure yourself.
