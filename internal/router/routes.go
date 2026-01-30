@@ -12,6 +12,7 @@ func Setup(r *Router,
 	webhookHandler *handler.WebhookHandler,
 	dashboardHandler *handler.DashboardHandler,
 	orgHandler *handler.OrganizationHandler,
+	invitationHandler *handler.InvitationHandler,
 	apiKeyRepo repository.ApiKeyRepository,
 	membershipRepo repository.MembershipRepository,
 	secret string,
@@ -34,6 +35,11 @@ func Setup(r *Router,
 		r.Get("/orgs", orgHandler.ListOrgs)
 		r.Post("/orgs", orgHandler.CreateOrg)
 
+		// Invitation routes (JWT auth only, no org scope needed)
+		r.Post("/invitations/accept", invitationHandler.AcceptInvitation)
+		r.Get("/invitations/pending", invitationHandler.GetPendingInvitations)
+		r.Post("/invitations/{id}/respond", invitationHandler.RespondToInvitation)
+
 		// Org-scoped routes (require X-Org-ID header)
 		r.Route("/", func(r *Router) {
 			r.Use(middleware.ValidateOrgAccess(membershipRepo))
@@ -50,6 +56,14 @@ func Setup(r *Router,
 
 			r.Get("/webhook-logs", dashboardHandler.WebhookLogs)
 			r.Get("/webhook-logs/{id}", dashboardHandler.WebhookLogDetail)
+
+			// Invitation routes (admin only)
+			r.Route("/invitations", func(r *Router) {
+				r.Use(middleware.RequireAdmin(membershipRepo))
+				r.Post("/", invitationHandler.CreateInvitation)
+				r.Get("/", invitationHandler.ListInvitations)
+				r.Delete("/{id}", invitationHandler.CancelInvitation)
+			})
 		})
 	})
 }

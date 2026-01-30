@@ -9,6 +9,7 @@ import (
 
 	"github.com/bilalabdelkadir/chis/internal/config"
 	"github.com/bilalabdelkadir/chis/internal/database"
+	"github.com/bilalabdelkadir/chis/internal/email"
 	"github.com/bilalabdelkadir/chis/internal/handler"
 	"github.com/bilalabdelkadir/chis/internal/logger"
 	"github.com/bilalabdelkadir/chis/internal/middleware"
@@ -65,12 +66,21 @@ func main() {
 
 	deliveryClient := pb.NewDeliveryServiceClient(conn)
 
+	invitationRepo := repository.NewInvitationRepository(pool)
+
+	// Email service
+	var emailService *email.EmailService
+	if cfg.ResendApiKey != "" {
+		emailService = email.NewEmailService(cfg.ResendApiKey, cfg.AppUrl)
+	}
+
 	// Handlers
 	authHandler := handler.NewAuthHandler(userRepo, accountRepo, orgRepo, membershipRepo, cfg.JwtSecret)
 	apiKeyHandler := handler.NewApiKeyHandler(apiKeyRepo)
 	webhookHandler := handler.NewWebhookHandler(deliveryClient)
 	dashboardHandler := handler.NewDashboardHandler(messageRepo, deliveryAttemptRepo)
 	orgHandler := handler.NewOrganizationHandler(orgRepo, membershipRepo)
+	invitationHandler := handler.NewInvitationHandler(invitationRepo, membershipRepo, userRepo, emailService)
 
 	// Router
 	r := router.NewRouter()
@@ -84,7 +94,7 @@ func main() {
 		http.ListenAndServe(":9090", mux)
 	}()
 
-	router.Setup(r, authHandler, apiKeyHandler, webhookHandler, dashboardHandler, orgHandler, apiKeyRepo, membershipRepo, cfg.JwtSecret)
+	router.Setup(r, authHandler, apiKeyHandler, webhookHandler, dashboardHandler, orgHandler, invitationHandler, apiKeyRepo, membershipRepo, cfg.JwtSecret)
 
 	slog.Info("server starting", "port", cfg.Port)
 	err = http.ListenAndServe(":"+cfg.Port, r)

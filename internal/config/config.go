@@ -8,13 +8,15 @@ import (
 )
 
 type Config struct {
-	Port      string
-	DbUrl     string
-	JwtSecret string
-	RedisUrl  string
-	GrpcAddr  string
-	Env       string
-	Origin    string
+	Port         string
+	DbUrl        string
+	JwtSecret    string
+	RedisUrl     string
+	GrpcAddr     string
+	Env          string
+	Origin       string
+	ResendApiKey string
+	AppUrl       string
 }
 
 func LoadEnv() (*Config, error) {
@@ -51,14 +53,23 @@ func LoadEnv() (*Config, error) {
 		origin = "localhost:8080"
 	}
 
+	resendApiKey := os.Getenv("RESEND_API_KEY")
+
+	appUrl := os.Getenv("APP_URL")
+	if appUrl == "" {
+		appUrl = "http://localhost:3000"
+	}
+
 	return &Config{
-		Port:      port,
-		DbUrl:     dbUrl,
-		JwtSecret: jwtSecret,
-		RedisUrl:  redisUlr,
-		GrpcAddr:  grpcAddr,
-		Env:       env,
-		Origin:    origin,
+		Port:         port,
+		DbUrl:        dbUrl,
+		JwtSecret:    jwtSecret,
+		RedisUrl:     redisUlr,
+		GrpcAddr:     grpcAddr,
+		Env:          env,
+		Origin:       origin,
+		ResendApiKey: resendApiKey,
+		AppUrl:       appUrl,
 	}, nil
 
 }

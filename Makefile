@@ -11,7 +11,13 @@ run-scheduler:
 
 run-grpc:
 	go run cmd/delivery/main.go
+include .env
+export
+
 # Database migrations
+migrate:
+	migrate -path internal/database/migrations -database "$(DB_URL)" up
+
 migrate-up:
 	migrate -path internal/database/migrations -database "$(DB_URL)" up
 
@@ -20,6 +26,9 @@ migrate-down:
 
 migrate-version:
 	migrate -path internal/database/migrations -database "$(DB_URL)" version
+
+migrate-force:
+	migrate -path internal/database/migrations -database "$(DB_URL)" force $(version)
 
 # Create a new migration (usage: make migrate-create name=add_something)
 migrate-create:

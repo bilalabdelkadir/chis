@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/bilalabdelkadir/chis/internal/model"
 	"github.com/google/uuid"
@@ -11,6 +12,7 @@ import (
 type UserRepository interface {
 	Create(ctx context.Context, user *model.User) error
 	FindByEmail(ctx context.Context, email string) (*model.User, error)
+	FindByID(ctx context.Context, id uuid.UUID) (*model.User, error)
 }
 
 type AccountRepository interface {
@@ -104,4 +106,24 @@ type MessageRepository interface {
 
 type OrganizationRepository interface {
 	Create(ctx context.Context, organization *model.Organization) error
+}
+
+type PendingInvitation struct {
+	ID        uuid.UUID `json:"id"`
+	OrgName   string    `json:"orgName"`
+	OrgSlug   string    `json:"orgSlug"`
+	Role      string    `json:"role"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+type InvitationRepository interface {
+	Create(ctx context.Context, invitation *model.Invitation) error
+	FindByID(ctx context.Context, id uuid.UUID) (*model.Invitation, error)
+	FindByToken(ctx context.Context, token string) (*model.Invitation, error)
+	FindByOrgID(ctx context.Context, orgID uuid.UUID) ([]*model.Invitation, error)
+	FindByOrgAndEmail(ctx context.Context, orgID uuid.UUID, email string) (*model.Invitation, error)
+	FindPendingByEmail(ctx context.Context, email string) ([]PendingInvitation, error)
+	UpdateStatus(ctx context.Context, id uuid.UUID, status string) error
+	AcceptInvitation(ctx context.Context, id uuid.UUID) error
+	Delete(ctx context.Context, id uuid.UUID) error
 }

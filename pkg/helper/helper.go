@@ -45,3 +45,12 @@ func HashSHA256(value string) string {
 	hash := sha256.Sum256([]byte(value))
 	return hex.EncodeToString(hash[:])
 }
+
+func GenerateSecureToken() (string, error) {
+	randomBytes := make([]byte, 32)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", fmt.Errorf("couldn't generate secure token: %w", err)
+	}
+	return hex.EncodeToString(randomBytes), nil
+}

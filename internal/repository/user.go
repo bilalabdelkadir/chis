@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/bilalabdelkadir/chis/internal/model"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -54,6 +55,33 @@ func (r *PostgresUserRepository) FindByEmail(ctx context.Context, email string) 
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			// No user found
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	return &u, nil
+}
+
+func (r *PostgresUserRepository) FindByID(ctx context.Context, id uuid.UUID) (*model.User, error) {
+	var u model.User
+
+	err := r.pool.QueryRow(ctx, `
+		SELECT id, email, first_name, last_name, email_verified, created_at, updated_at
+		FROM users
+		WHERE id = $1
+	`, id).Scan(
+		&u.ID,
+		&u.Email,
+		&u.FirstName,
+		&u.LastName,
+		&u.EmailVerified,
+		&u.CreatedAt,
+		&u.UpdatedAt,
+	)
+
+	if err != nil {
+		if err == pgx.ErrNoRows {
 			return nil, ErrNotFound
 		}
 		return nil, err
