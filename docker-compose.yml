@@ -9,97 +9,65 @@ services:
       - '5433:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
 
   redis:
     image: redis:7.2-alpine
     ports:
       - '6373:6379'
 
-  migrate:
-    image: bilalabdelkadir/chis-migrate:latest
-    build:
-      context: .
-      dockerfile: Dockerfile.migrate
-    command: ["postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?sslmode=disable", "up"]
-    depends_on:
-      database:
-        condition: service_healthy
-
   api:
     image: bilalabdelkadir/chis-api:latest
-    build:
-      context: .
-      args:
-        SERVICE: api
     environment:
       DB_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?sslmode=disable
       JWT_SECRET: ${JWT_SECRET}
       DELIVERY_GRPC_ADDR: ${DELIVERY_GRPC_ADDR}
       REDIS_URL: ${REDIS_URL}
     depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_started
+      - database
+      - redis
     ports:
       - '8080:8080'
 
   delivery:
     image: bilalabdelkadir/chis-delivery:latest
-    build:
-      context: .
-      args:
-        SERVICE: delivery
     environment:
       DB_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?sslmode=disable
       REDIS_URL: ${REDIS_URL}
     depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_started
+      - database
+      - redis
     ports:
       - '8082:8082'
       - '50051:50051'
 
   worker:
     image: bilalabdelkadir/chis-worker:latest
-    build:
-      context: .
-      args:
-        SERVICE: worker
     environment:
       DB_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?sslmode=disable
       REDIS_URL: ${REDIS_URL}
     depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_started
+      - database
+      - redis
     ports:
       - '8083:8083'
 
   scheduler:
     image: bilalabdelkadir/chis-scheduler:latest
-    build:
-      context: .
-      args:
-        SERVICE: scheduler
     environment:
       DB_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?sslmode=disable
       REDIS_URL: ${REDIS_URL}
     depends_on:
-      migrate:
-        condition: service_completed_successfully
-      redis:
-        condition: service_started
+      - database
+      - redis
     ports:
       - '8084:8084'
+  dozzle:
+    image: amir20/dozzle:latest
+    restart: always
+    ports:
+      - '9999:8080'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   pgdata:
