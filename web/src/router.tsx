@@ -7,6 +7,7 @@ import { DashboardPage } from "@/features/dashboard/pages/dashboard-page";
 import { OverviewPage } from "@/features/dashboard/pages/overview-page";
 import { ApiKeysPage } from "@/features/dashboard/pages/api-keys-page";
 import { LogsPage } from "@/features/dashboard/pages/logs-page";
+import { PlaygroundPage } from "@/features/dashboard/pages/playground-page";
 
 export const router = createBrowserRouter([
   {
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
           { index: true, element: <OverviewPage /> },
           { path: "api-keys", element: <ApiKeysPage /> },
           { path: "logs", element: <LogsPage /> },
+          { path: "playground", element: <PlaygroundPage /> },
         ],
       },
     ],

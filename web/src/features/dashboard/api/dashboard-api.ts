@@ -5,8 +5,11 @@ import type {
   CreateApiKeyRequest,
   CreateApiKeyResponse,
   WebhookLog,
+  WebhookLogDetail,
   WebhookLogsParams,
   PaginatedResponse,
+  SendWebhookRequest,
+  SendWebhookResponse,
 } from "../types/dashboard.types";
 
 export function fetchDashboardStats(): Promise<DashboardStats> {
@@ -44,6 +47,14 @@ export function deleteApiKey(id: string): Promise<void> {
   });
 }
 
+export function fetchWebhookLogDetail(id: string): Promise<WebhookLogDetail> {
+  return apiRequest<WebhookLogDetail>({
+    method: "GET",
+    path: `/api/webhook-logs/${id}`,
+    auth: true,
+  });
+}
+
 export function fetchWebhookLogs(
   params?: WebhookLogsParams,
 ): Promise<PaginatedResponse<WebhookLog>> {
@@ -61,4 +72,27 @@ export function fetchWebhookLogs(
     path,
     auth: true,
   });
+}
+
+const BASE_URL = import.meta.env.VITE_API_URL ?? "";
+
+export async function sendTestWebhook(
+  apiKey: string,
+  request: SendWebhookRequest,
+): Promise<SendWebhookResponse> {
+  const response = await fetch(`${BASE_URL}/webhook/send`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-Key": apiKey,
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || `Request failed with status ${response.status}`);
+  }
+
+  return response.json() as Promise<SendWebhookResponse>;
 }

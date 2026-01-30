@@ -49,3 +49,37 @@ export interface PaginatedResponse<T> {
   limit: number;
   totalPages: number;
 }
+
+export interface DeliveryAttemptDetail {
+  id: string;
+  attemptNumber: number;
+  statusCode: number | null;
+  responseBody: string | null;
+  errorMessage: string | null;
+  durationMs: number | null;
+  attemptedAt: string;
+}
+
+export interface SendWebhookRequest {
+  url: string;
+  method: string;
+  payload: unknown;
+}
+
+export interface SendWebhookResponse {
+  messageId: string;
+  status: string;
+}
+
+export interface WebhookLogDetail {
+  id: string;
+  method: string;
+  url: string;
+  status: string;
+  payload: unknown;
+  attemptCount: number;
+  createdAt: string;
+  updatedAt: string;
+  nextRetryAt: string | null;
+  deliveryAttempts: DeliveryAttemptDetail[];
+}
