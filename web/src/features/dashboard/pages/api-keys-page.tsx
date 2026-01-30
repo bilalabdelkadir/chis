@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { PageHeader } from "../components/page-header";
 import { useApiKeys } from "../hooks/use-api-keys";
 
 export function ApiKeysPage() {
@@ -44,22 +45,20 @@ export function ApiKeysPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h2 className="text-lg font-medium">API Keys</h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Manage your API keys for programmatic access.
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="API Keys"
+        description="Create and manage API keys for programmatic access to the webhook API."
+      />
 
       {error && (
-        <div className="bg-destructive/10 text-destructive rounded-lg p-4 mb-6 text-sm">
+        <div className="mb-6 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
 
       {newlyCreatedKey && (
-        <Card className="border-primary/30 mb-6">
+        <Card className="mb-6 border-primary/30 bg-primary/5">
           <CardContent className="pt-4">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
@@ -102,23 +101,22 @@ export function ApiKeysPage() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="h-16 animate-pulse rounded-xl bg-muted"
+              className="h-16 animate-pulse rounded-lg bg-muted"
             />
           ))}
         </div>
       ) : apiKeys.length === 0 ? (
-        <Card>
-          <CardContent className="py-8">
-            <p className="text-muted-foreground text-sm text-center">
-              No API keys yet. Create one to get started.
-            </p>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <p className="text-sm font-medium text-muted-foreground">No API keys yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">Create a key to start sending webhooks.</p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
           {apiKeys.map((key) => (
-            <Card key={key.id}>
-              <CardContent className="flex items-center justify-between py-3">
+            <Card key={key.id} className="border-border/80">
+              <CardContent className="flex items-center justify-between py-4">
                 <div className="flex items-center gap-6">
                   <div>
                     <p className="text-sm font-medium">{key.name}</p>
@@ -165,6 +163,6 @@ export function ApiKeysPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }

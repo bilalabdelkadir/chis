@@ -18,6 +18,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
+import { PageHeader } from '../components/page-header';
 import { useWebhookLogs } from '../hooks/use-webhook-logs';
 import { WebhookLogDetailView } from '../components/webhook-log-detail';
 import type { WebhookLog } from '../types/dashboard.types';
@@ -54,16 +55,14 @@ export function LogsPage() {
         if (!open) setSelectedLogId(null);
       }}
     >
-      <div className="p-8">
-        <div className="mb-6">
-          <h2 className="text-lg font-medium">Webhook Logs</h2>
-          <p className="text-muted-foreground text-sm mt-1">
-            View delivery logs for your webhooks.
-          </p>
-        </div>
+      <div>
+        <PageHeader
+          title="Logs"
+          description="Delivery history and status for your webhooks. Click a row to see details."
+        />
 
         {error && (
-          <div className="bg-destructive/10 text-destructive rounded-lg p-4 mb-6 text-sm">
+          <div className="mb-6 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         )}
@@ -96,10 +95,10 @@ export function LogsPage() {
           </Select>
         </div>
 
-        <Card>
+        <Card className="border-border/80 overflow-hidden">
           <CardContent className="p-0">
             {/* Header row */}
-            <div className="grid grid-cols-6 gap-4 px-4 py-2 text-xs text-muted-foreground font-medium border-b border-border">
+            <div className="grid grid-cols-6 gap-4 px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground border-b border-border bg-muted/30">
               <span>Status</span>
               <span>Endpoint</span>
               <span>Event</span>
@@ -117,8 +116,9 @@ export function LogsPage() {
                 ))}
               </div>
             ) : logs.length === 0 ? (
-              <div className="px-4 py-8 text-center text-muted-foreground text-sm">
-                No logs found.
+              <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+                <p className="text-sm font-medium text-muted-foreground">No logs yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">Webhook deliveries will appear here.</p>
               </div>
             ) : (
               <div className="divide-y divide-border">

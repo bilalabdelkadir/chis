@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "../components/page-header";
 import { sendTestWebhook } from "../api/dashboard-api";
 import type { SendWebhookResponse } from "../types/dashboard.types";
 
@@ -99,17 +100,15 @@ export function PlaygroundPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h2 className="text-lg font-medium">Playground</h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Test webhook sends interactively using your API key.
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="Playground"
+        description="Send test webhooks to any URL. Useful for debugging and integration checks."
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left panel — Request Builder */}
-        <Card>
+        <Card className="border-border/80">
           <CardHeader>
             <CardTitle className="text-sm font-medium">Request</CardTitle>
           </CardHeader>
@@ -198,13 +197,13 @@ export function PlaygroundPage() {
 
         {/* Right panel — Response */}
         <div className="space-y-6">
-          <Card>
+          <Card className="border-border/80">
             <CardHeader>
               <CardTitle className="text-sm font-medium">Response</CardTitle>
             </CardHeader>
             <CardContent>
               {error && (
-                <div className="bg-destructive/10 text-destructive rounded-lg p-4 text-sm">
+                <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
                   {error}
                 </div>
               )}
@@ -253,7 +252,7 @@ export function PlaygroundPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-border/80">
             <CardHeader>
               <CardTitle className="text-sm font-medium">
                 How it works
@@ -294,6 +293,6 @@ export function PlaygroundPage() {
           </Card>
         </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { PageHeader } from "../components/page-header";
 import { useInvitations } from "../hooks/use-invitations";
 
 function statusVariant(status: string) {
@@ -43,16 +44,14 @@ export function MembersPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h2 className="text-lg font-medium">Members</h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Invite people to your organization and manage pending invitations.
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="Members"
+        description="Invite people to your organization and manage pending invitations."
+      />
 
       {error && (
-        <div className="bg-destructive/10 text-destructive rounded-lg p-4 mb-6 text-sm">
+        <div className="mb-6 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       )}
@@ -81,18 +80,17 @@ export function MembersPage() {
           ))}
         </div>
       ) : invitations.length === 0 ? (
-        <Card>
-          <CardContent className="py-8">
-            <p className="text-muted-foreground text-sm text-center">
-              No invitations yet. Send one to get started.
-            </p>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <p className="text-sm font-medium text-muted-foreground">No invitations yet</p>
+            <p className="mt-1 text-xs text-muted-foreground">Invite teammates by email above.</p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-3">
           {invitations.map((inv) => (
-            <Card key={inv.id}>
-              <CardContent className="flex items-center justify-between py-3">
+            <Card key={inv.id} className="border-border/80">
+              <CardContent className="flex items-center justify-between py-4">
                 <div className="flex items-center gap-4">
                   <div>
                     <p className="text-sm font-medium">{inv.email}</p>
@@ -137,6 +135,6 @@ export function MembersPage() {
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }

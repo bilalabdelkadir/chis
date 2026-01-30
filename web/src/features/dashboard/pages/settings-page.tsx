@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { PageHeader } from "../components/page-header";
 import { useOrg } from "@/shared/context/org-context";
 import { deleteOrganization } from "../api/organization-api";
 import { useSigningSecret } from "../hooks/use-signing-secret";
@@ -76,18 +77,16 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h2 className="text-lg font-medium">Settings</h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Manage your organization settings.
-        </p>
-      </div>
+    <>
+      <PageHeader
+        title="Settings"
+        description="Organization settings, signing secret, and danger zone."
+      />
 
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-sm font-medium mb-3">Webhook Signing Secret</h3>
-          <Card>
+      <div className="space-y-8">
+        <section>
+          <h2 className="text-sm font-medium text-foreground mb-3">Webhook Signing Secret</h2>
+          <Card className="border-border/80">
             <CardContent className="py-4">
               <p className="text-muted-foreground text-xs mb-3">
                 Used to sign webhook payloads so receivers can verify
@@ -157,13 +156,13 @@ export function SettingsPage() {
               ) : null}
             </CardContent>
           </Card>
-        </div>
+        </section>
 
-        <div>
-          <h3 className="text-sm font-medium text-destructive mb-3">
+        <section>
+          <h2 className="text-sm font-medium text-destructive mb-3">
             Danger zone
-          </h3>
-          <Card className="border-destructive/30">
+          </h2>
+          <Card className="border-destructive/30 border-border/80">
             <CardContent className="flex items-center justify-between py-4">
               <div>
                 <p className="text-sm font-medium">Delete organization</p>
@@ -227,8 +226,8 @@ export function SettingsPage() {
               </AlertDialog>
             </CardContent>
           </Card>
-        </div>
+        </section>
       </div>
-    </div>
+    </>
   );
 }

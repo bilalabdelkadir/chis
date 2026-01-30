@@ -23,12 +23,21 @@ import { Label } from "@/components/ui/label";
 import { useOrg } from "@/shared/context/org-context";
 import { createOrganization } from "../api/organization-api";
 
-export function OrgSwitcher() {
+interface OrgSwitcherProps {
+  variant?: "default" | "sidebar";
+}
+
+export function OrgSwitcher({ variant = "default" }: OrgSwitcherProps) {
   const { organizations, currentOrg, switchOrg, addOrg } = useOrg();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const triggerClass =
+    variant === "sidebar"
+      ? "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground [&_svg]:text-sidebar-foreground/70"
+      : "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium hover:bg-accent focus:outline-none";
 
   async function handleCreate() {
     const name = newOrgName.trim();
@@ -51,10 +60,10 @@ export function OrgSwitcher() {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium hover:bg-accent focus:outline-none">
-          <Building2 className="size-4" />
-          <span>{currentOrg?.name ?? "Select org"}</span>
-          <ChevronDown className="size-3 text-muted-foreground" />
+        <DropdownMenuTrigger className={triggerClass}>
+          <Building2 className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">{currentOrg?.name ?? "Select org"}</span>
+          <ChevronDown className="size-3 shrink-0" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" sideOffset={8}>
           <DropdownMenuGroup>
