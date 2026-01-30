@@ -3,6 +3,7 @@ import Layout from '../layouts/main.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import CodeTabs from '../components/CodeTabs';
+import VerifyTabs from '../components/VerifyTabs';
 import { getCollection } from 'astro:content';
 
 const latestPosts = (await getCollection('blog', ({ data }) => !data.draft))
@@ -210,6 +211,22 @@ const latestPosts = (await getCollection('blog', ({ data }) => !data.draft))
 				</div>
 				<div class="mt-12">
 					<CodeTabs client:load />
+				</div>
+			</div>
+		</section>
+
+		<!-- Verify -->
+		<section class="py-20 px-6 border-t border-surface-800/50">
+			<div class="max-w-5xl mx-auto">
+				<div class="max-w-2xl">
+					<p class="text-sm font-medium text-brand-400 mb-3">Receive</p>
+					<h2 class="text-3xl font-bold text-white tracking-tight">Verify on your end.</h2>
+					<p class="mt-4 text-surface-400 leading-relaxed">
+						Every webhook is signed with HMAC-SHA256. Drop this function into your receiver to verify authenticity.
+					</p>
+				</div>
+				<div class="mt-12">
+					<VerifyTabs client:load />
 				</div>
 			</div>
 		</section>
