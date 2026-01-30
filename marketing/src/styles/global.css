@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@plugin '@tailwindcss/typography';
 
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
@@ -72,4 +73,74 @@ body {
 
 code {
   @apply font-mono;
+}
+
+/* Blog article typography */
+.article-content h2 {
+  @apply text-2xl font-bold text-white mt-10 mb-4 tracking-tight;
+}
+
+.article-content h3 {
+  @apply text-xl font-bold text-white mt-8 mb-3 tracking-tight;
+}
+
+.article-content p {
+  @apply text-surface-300 leading-relaxed mb-4;
+}
+
+.article-content ul,
+.article-content ol {
+  @apply text-surface-300 pl-6 mb-4 space-y-2;
+}
+
+.article-content ul {
+  @apply list-disc;
+}
+
+.article-content ol {
+  @apply list-decimal;
+}
+
+.article-content a {
+  @apply text-brand-400 hover:text-brand-200 transition-colors;
+}
+
+.article-content code {
+  @apply font-mono text-brand-400 bg-surface-800 px-1.5 py-0.5 rounded text-sm;
+}
+
+.article-content pre {
+  @apply bg-surface-900 border border-surface-800 rounded-xl p-5 overflow-x-auto mb-6;
+}
+
+.article-content pre code {
+  @apply bg-transparent px-0 py-0;
+}
+
+.article-content blockquote {
+  @apply border-l-4 border-brand-500 pl-4 my-6 text-surface-400 italic;
+}
+
+.article-content img {
+  @apply rounded-xl border border-surface-800 my-6;
+}
+
+.article-content hr {
+  @apply border-surface-800 my-8;
+}
+
+.article-content strong {
+  @apply text-white font-semibold;
+}
+
+.article-content table {
+  @apply w-full text-sm text-surface-300 mb-6;
+}
+
+.article-content th {
+  @apply text-left text-white font-medium pb-3 border-b border-surface-800;
+}
+
+.article-content td {
+  @apply py-2 border-b border-surface-800/50;
 }
