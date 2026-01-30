@@ -17,6 +17,7 @@ interface OrgContextValue {
   currentOrg: Organization | null;
   switchOrg: (org: Organization) => void;
   addOrg: (org: Organization) => void;
+  removeOrg: (orgId: string) => void;
 }
 
 const OrgContext = createContext<OrgContextValue | null>(null);
@@ -65,9 +66,23 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(SELECTED_ORG_KEY, org.id);
   }, []);
 
+  const removeOrg = useCallback((orgId: string) => {
+    setOrganizations((prev) => {
+      const remaining = prev.filter((o) => o.id !== orgId);
+      if (remaining.length > 0) {
+        setCurrentOrg(remaining[0]);
+        localStorage.setItem(SELECTED_ORG_KEY, remaining[0].id);
+      } else {
+        setCurrentOrg(null);
+        localStorage.removeItem(SELECTED_ORG_KEY);
+      }
+      return remaining;
+    });
+  }, []);
+
   const value = useMemo<OrgContextValue>(
-    () => ({ organizations, currentOrg, switchOrg, addOrg }),
-    [organizations, currentOrg, switchOrg, addOrg]
+    () => ({ organizations, currentOrg, switchOrg, addOrg, removeOrg }),
+    [organizations, currentOrg, switchOrg, addOrg, removeOrg]
   );
 
   return <OrgContext.Provider value={value}>{children}</OrgContext.Provider>;

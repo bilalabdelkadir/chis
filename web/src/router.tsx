@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import { PublicRoute } from "@/shared/components/public-route";
 import { ProtectedRoute } from "@/shared/components/protected-route";
+import { AdminRoute } from "@/shared/components/admin-route";
 import { LoginPage } from "@/features/auth/pages/login-page";
 import { RegisterPage } from "@/features/auth/pages/register-page";
 import { DashboardPage } from "@/features/dashboard/pages/dashboard-page";
@@ -9,6 +10,7 @@ import { ApiKeysPage } from "@/features/dashboard/pages/api-keys-page";
 import { LogsPage } from "@/features/dashboard/pages/logs-page";
 import { PlaygroundPage } from "@/features/dashboard/pages/playground-page";
 import { MembersPage } from "@/features/dashboard/pages/members-page";
+import { SettingsPage } from "@/features/dashboard/pages/settings-page";
 import { AcceptInvitePage } from "@/features/invite/accept-invite-page";
 
 export const router = createBrowserRouter([
@@ -30,7 +32,13 @@ export const router = createBrowserRouter([
           { path: "api-keys", element: <ApiKeysPage /> },
           { path: "logs", element: <LogsPage /> },
           { path: "playground", element: <PlaygroundPage /> },
-          { path: "members", element: <MembersPage /> },
+          {
+            element: <AdminRoute />,
+            children: [
+              { path: "members", element: <MembersPage /> },
+              { path: "settings", element: <SettingsPage /> },
+            ],
+          },
         ],
       },
       { path: "/invite/accept", element: <AcceptInvitePage /> },

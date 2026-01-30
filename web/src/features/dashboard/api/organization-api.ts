@@ -22,3 +22,12 @@ export function createOrganization(
     auth: true,
   });
 }
+
+export function deleteOrganization(name: string): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>({
+    method: "DELETE",
+    path: "/api/org",
+    body: { name },
+    auth: true,
+  });
+}
