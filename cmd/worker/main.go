@@ -42,6 +42,7 @@ func main() {
 
 	messageRepo := repository.NewMessageRepository(pool)
 	attemptRepo := repository.NewDeliveryAttemptsRepository(pool)
+	orgRepo := repository.NewOrganizationRepository(pool)
 
 	ctx := context.Background()
 
@@ -62,6 +63,6 @@ func main() {
 		}
 	}()
 
-	w := worker.NewWorker(messageRepo, attemptRepo, queue)
+	w := worker.NewWorker(messageRepo, attemptRepo, orgRepo, queue)
 	w.Start(context.Background())
 }

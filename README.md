@@ -42,6 +42,7 @@ When a webhook is submitted to the API service, it authenticates the request usi
 - **Health check endpoints** - `/health` on all services for Kubernetes liveness/readiness probes
 - **gRPC-based delivery service** - Strongly-typed message queuing with Protobuf
 - **Concurrent worker processing** - Multiple worker instances can run in parallel for horizontal scaling
+- **HMAC-SHA256 webhook signing** - Every delivery includes cryptographic signatures for payload verification
 - **Dead-letter queue semantics** - Messages exceeding 5 attempts marked as "failed" for manual intervention
 
 ---
@@ -166,6 +167,89 @@ curl http://localhost:8082/health  # Delivery
 curl http://localhost:8083/health  # Worker
 curl http://localhost:8084/health  # Scheduler
 ```
+
+---
+
+## Webhook Signature Verification
+
+Every webhook delivery includes three headers for payload verification:
+
+| Header | Value | Purpose |
+|---|---|---|
+| `X-Webhook-ID` | `msg_<uuid>` | Idempotency key |
+| `X-Webhook-Timestamp` | Unix epoch seconds | Replay attack prevention |
+| `X-Webhook-Signature` | `v1,<base64-hmac>` | HMAC-SHA256 signature |
+
+The signature is computed over `{msg_id}.{timestamp}.{body}` using HMAC-SHA256 with the organization's signing secret.
+
+### Verification Examples
+
+**Node.js:**
+
+```javascript
+const crypto = require('crypto');
+
+function verifyWebhook(body, headers, secret) {
+  const msgId = headers['x-webhook-id'];
+  const timestamp = headers['x-webhook-timestamp'];
+  const signature = headers['x-webhook-signature'];
+
+  // Check timestamp is within 5 minutes
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - parseInt(timestamp)) > 300) {
+    throw new Error('Timestamp too old');
+  }
+
+  const signedContent = `${msgId}.${timestamp}.${body}`;
+  const expectedSig = crypto
+    .createHmac('sha256', secret)
+    .update(signedContent)
+    .digest('base64');
+
+  const expected = `v1,${expectedSig}`;
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expected)
+  );
+}
+```
+
+**Python:**
+
+```python
+import hmac
+import hashlib
+import base64
+import time
+
+def verify_webhook(body: str, headers: dict, secret: str) -> bool:
+    msg_id = headers['x-webhook-id']
+    timestamp = headers['x-webhook-timestamp']
+    signature = headers['x-webhook-signature']
+
+    # Check timestamp is within 5 minutes
+    if abs(time.time() - int(timestamp)) > 300:
+        raise ValueError('Timestamp too old')
+
+    signed_content = f"{msg_id}.{timestamp}.{body}"
+    expected_sig = base64.b64encode(
+        hmac.new(
+            secret.encode(),
+            signed_content.encode(),
+            hashlib.sha256
+        ).digest()
+    ).decode()
+
+    expected = f"v1,{expected_sig}"
+    return hmac.compare_digest(signature, expected)
+```
+
+### Signing Secret Management
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/org/signing-secret` | GET | Retrieve the current signing secret (admin only) |
+| `/api/org/signing-secret/rotate` | POST | Generate a new secret, immediately invalidating the old one (admin only) |
 
 ---
 

@@ -108,6 +108,8 @@ type OrganizationRepository interface {
 	Create(ctx context.Context, organization *model.Organization) error
 	FindByID(ctx context.Context, id uuid.UUID) (*model.Organization, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+	GetSigningSecret(ctx context.Context, orgID uuid.UUID) (string, error)
+	RotateSigningSecret(ctx context.Context, orgID uuid.UUID, newSecret string) error
 }
 
 type PendingInvitation struct {

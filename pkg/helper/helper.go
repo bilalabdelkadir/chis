@@ -46,6 +46,15 @@ func HashSHA256(value string) string {
 	return hex.EncodeToString(hash[:])
 }
 
+func GenerateSigningSecret() (string, error) {
+	randomBytes := make([]byte, 32)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", fmt.Errorf("couldn't generate signing secret: %w", err)
+	}
+	return "whsec_" + hex.EncodeToString(randomBytes), nil
+}
+
 func GenerateSecureToken() (string, error) {
 	randomBytes := make([]byte, 32)
 	_, err := rand.Read(randomBytes)

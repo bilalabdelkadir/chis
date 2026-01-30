@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useOrg } from "@/shared/context/org-context";
 import { deleteOrganization } from "../api/organization-api";
+import { useSigningSecret } from "../hooks/use-signing-secret";
 
 export function SettingsPage() {
   const { currentOrg, removeOrg } = useOrg();
@@ -23,6 +24,18 @@ export function SettingsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
+
+  const {
+    signingSecret,
+    isLoading: isSecretLoading,
+    error: secretError,
+    rotate,
+    isRotating,
+  } = useSigningSecret();
+
+  const [secretVisible, setSecretVisible] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [rotateOpen, setRotateOpen] = useState(false);
 
   const orgName = currentOrg?.name ?? "";
   const canDelete = confirmName === orgName;
@@ -44,6 +57,24 @@ export function SettingsPage() {
     }
   }
 
+  function handleCopy() {
+    if (signingSecret) {
+      navigator.clipboard.writeText(signingSecret);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  async function handleRotate() {
+    await rotate();
+    setRotateOpen(false);
+  }
+
+  function maskedSecret(secret: string) {
+    if (secret.length <= 6) return secret;
+    return secret.slice(0, 6) + "\u2022".repeat(12);
+  }
+
   return (
     <div className="p-8">
       <div className="mb-6">
@@ -54,6 +85,80 @@ export function SettingsPage() {
       </div>
 
       <div className="space-y-6">
+        <div>
+          <h3 className="text-sm font-medium mb-3">Webhook Signing Secret</h3>
+          <Card>
+            <CardContent className="py-4">
+              <p className="text-muted-foreground text-xs mb-3">
+                Used to sign webhook payloads so receivers can verify
+                authenticity. Every delivery includes{" "}
+                <code className="text-xs bg-muted px-1 py-0.5 rounded">
+                  X-Webhook-Signature
+                </code>{" "}
+                headers.
+              </p>
+
+              {isSecretLoading ? (
+                <div className="h-9 bg-muted animate-pulse rounded" />
+              ) : secretError ? (
+                <p className="text-destructive text-xs">{secretError}</p>
+              ) : signingSecret ? (
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-sm bg-muted px-3 py-2 rounded font-mono select-all">
+                    {secretVisible
+                      ? signingSecret
+                      : maskedSecret(signingSecret)}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSecretVisible(!secretVisible)}
+                  >
+                    {secretVisible ? "Hide" : "Reveal"}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleCopy}>
+                    {copied ? "Copied!" : "Copy"}
+                  </Button>
+                  <AlertDialog
+                    open={rotateOpen}
+                    onOpenChange={setRotateOpen}
+                  >
+                    <AlertDialogTrigger
+                      render={
+                        <Button variant="outline" size="sm">
+                          Rotate
+                        </Button>
+                      }
+                    />
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Rotate signing secret?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          The current secret will be immediately invalidated.
+                          All webhook receivers using the old secret will fail
+                          verification until updated.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <Button
+                          variant="destructive"
+                          disabled={isRotating}
+                          onClick={handleRotate}
+                        >
+                          {isRotating ? "Rotating..." : "Rotate secret"}
+                        </Button>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+
         <div>
           <h3 className="text-sm font-medium text-destructive mb-3">
             Danger zone

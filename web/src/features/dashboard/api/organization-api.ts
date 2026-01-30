@@ -31,3 +31,19 @@ export function deleteOrganization(name: string): Promise<{ message: string }> {
     auth: true,
   });
 }
+
+export function getSigningSecret(): Promise<{ signingSecret: string }> {
+  return apiRequest<{ signingSecret: string }>({
+    method: "GET",
+    path: "/api/org/signing-secret",
+    auth: true,
+  });
+}
+
+export function rotateSigningSecret(): Promise<{ signingSecret: string }> {
+  return apiRequest<{ signingSecret: string }>({
+    method: "POST",
+    path: "/api/org/signing-secret/rotate",
+    auth: true,
+  });
+}

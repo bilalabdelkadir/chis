@@ -3,6 +3,7 @@ package worker
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/bilalabdelkadir/chis/internal/model"
 	"github.com/bilalabdelkadir/chis/internal/queue"
 	"github.com/bilalabdelkadir/chis/internal/repository"
+	"github.com/bilalabdelkadir/chis/pkg/helper"
 	"github.com/google/uuid"
 )
 
@@ -23,16 +25,18 @@ const (
 type Worker struct {
 	messageRepo repository.MessageRepository
 	attemptRepo repository.DeliveryAttemptRepository
+	orgRepo     repository.OrganizationRepository
 	queue       *queue.Queue
 	httpClient  *http.Client
 }
 
 func NewWorker(messageRepo repository.MessageRepository, attemptRepo repository.DeliveryAttemptRepository,
-	queue *queue.Queue,
+	orgRepo repository.OrganizationRepository, queue *queue.Queue,
 ) *Worker {
 	return &Worker{
 		messageRepo: messageRepo,
 		attemptRepo: attemptRepo,
+		orgRepo:     orgRepo,
 		queue:       queue,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
@@ -79,6 +83,17 @@ func (w *Worker) deliver(ctx context.Context, msg *model.Message) {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+
+	msgID := "msg_" + msg.ID.String()
+	secret, secretErr := w.orgRepo.GetSigningSecret(ctx, msg.OrgID)
+	if secretErr != nil {
+		slog.Error("webhook_signing_secret_lookup_failed", "message_id", msg.ID, "org_id", msg.OrgID, "error", secretErr)
+	} else {
+		sig := helper.SignWebhookPayload(msgID, secret, msg.Payload)
+		req.Header.Set("X-Webhook-ID", sig.MessageID)
+		req.Header.Set("X-Webhook-Timestamp", fmt.Sprintf("%d", sig.Timestamp))
+		req.Header.Set("X-Webhook-Signature", sig.Signature)
+	}
 
 	slog.Info("webhook_delivering", "message_id", msg.ID, "org_id", msg.OrgID, "url", msg.URL)
 

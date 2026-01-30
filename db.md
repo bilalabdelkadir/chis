@@ -43,6 +43,7 @@ Organization
 - id (PK, uuid)
 - name (not null)
 - slug (unique, not null)
+- signingSecret (not null)
 - createdAt (timestamp)
 - updatedAt (timestamp)
 

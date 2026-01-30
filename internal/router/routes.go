@@ -68,6 +68,8 @@ func Setup(r *Router,
 			r.Route("/org", func(r *Router) {
 				r.Use(middleware.RequireAdmin(membershipRepo))
 				r.Delete("/", orgHandler.DeleteOrg)
+				r.Get("/signing-secret", orgHandler.GetSigningSecret)
+				r.Post("/signing-secret/rotate", orgHandler.RotateSigningSecret)
 			})
 		})
 	})

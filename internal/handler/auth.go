@@ -136,9 +136,15 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) error {
 	orgName := user.FirstName + "'s Workspace"
 	slug := helper.Slugify(orgName)
 
+	signingSecret, err := helper.GenerateSigningSecret()
+	if err != nil {
+		return apperror.Internal("failed to generate signing secret")
+	}
+
 	org := &model.Organization{
-		Name: orgName,
-		Slug: slug,
+		Name:          orgName,
+		Slug:          slug,
+		SigningSecret: signingSecret,
 	}
 
 	if err := h.organizationRepo.Create(r.Context(), org); err != nil {

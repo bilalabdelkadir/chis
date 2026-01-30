@@ -107,9 +107,15 @@ func (h *OrganizationHandler) CreateOrg(w http.ResponseWriter, r *http.Request) 
 
 	slug := helper.Slugify(req.Name)
 
+	signingSecret, err := helper.GenerateSigningSecret()
+	if err != nil {
+		return apperror.Internal("failed to generate signing secret")
+	}
+
 	org := &model.Organization{
-		Name: req.Name,
-		Slug: slug,
+		Name:          req.Name,
+		Slug:          slug,
+		SigningSecret: signingSecret,
 	}
 
 	if err := h.organizationRepo.Create(r.Context(), org); err != nil {
@@ -134,5 +140,39 @@ func (h *OrganizationHandler) CreateOrg(w http.ResponseWriter, r *http.Request) 
 	}
 
 	response.WriteJSON(w, http.StatusCreated, res)
+	return nil
+}
+
+func (h *OrganizationHandler) GetSigningSecret(w http.ResponseWriter, r *http.Request) error {
+	orgID, err := extractOrgID(r)
+	if err != nil {
+		return err
+	}
+
+	secret, err := h.organizationRepo.GetSigningSecret(r.Context(), orgID)
+	if err != nil {
+		return apperror.Internal("failed to fetch signing secret")
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]string{"signingSecret": secret})
+	return nil
+}
+
+func (h *OrganizationHandler) RotateSigningSecret(w http.ResponseWriter, r *http.Request) error {
+	orgID, err := extractOrgID(r)
+	if err != nil {
+		return err
+	}
+
+	newSecret, err := helper.GenerateSigningSecret()
+	if err != nil {
+		return apperror.Internal("failed to generate signing secret")
+	}
+
+	if err := h.organizationRepo.RotateSigningSecret(r.Context(), orgID, newSecret); err != nil {
+		return apperror.Internal("failed to rotate signing secret")
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]string{"signingSecret": newSecret})
 	return nil
 }
