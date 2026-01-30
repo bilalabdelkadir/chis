@@ -1,0 +1,24 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#09090b"/>
+  <rect x="0" y="0" width="1200" height="4" fill="#6366f1"/>
+  <!-- Decorative -->
+  <circle cx="1050" cy="150" r="120" stroke="#6366f1" stroke-width="1" opacity="0.15"/>
+  <circle cx="170" cy="500" r="160" stroke="#1a1a1f" stroke-width="1" opacity="0.5"/>
+  <!-- Chart bars icon -->
+  <g transform="translate(100, 150)">
+    <rect x="0" y="50" width="16" height="40" rx="2" fill="#6366f1" opacity="0.4"/>
+    <rect x="22" y="30" width="16" height="60" rx="2" fill="#6366f1" opacity="0.6"/>
+    <rect x="44" y="10" width="16" height="80" rx="2" fill="#6366f1" opacity="0.8"/>
+    <rect x="66" y="25" width="16" height="65" rx="2" fill="#6366f1"/>
+    <rect x="88" y="40" width="16" height="50" rx="2" fill="#818cf8"/>
+    <!-- Baseline -->
+    <line x1="0" y1="92" x2="104" y2="92" stroke="#27272a" stroke-width="1"/>
+  </g>
+  <!-- Title -->
+  <text x="100" y="320" font-family="Inter, system-ui, sans-serif" font-size="42" font-weight="700" fill="white" letter-spacing="-0.02em">Webhook Monitoring</text>
+  <text x="100" y="375" font-family="Inter, system-ui, sans-serif" font-size="42" font-weight="700" fill="white" letter-spacing="-0.02em">&amp; Observability</text>
+  <text x="100" y="425" font-family="Inter, system-ui, sans-serif" font-size="36" font-weight="700" fill="#a1a1aa" letter-spacing="-0.02em">Debug Delivery Failures Fast</text>
+  <!-- Branding -->
+  <text x="100" y="560" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600" fill="#6366f1">Chis Blog</text>
+  <text x="100" y="585" font-family="Inter, system-ui, sans-serif" font-size="14" fill="#3f3f46">trychis.com</text>
+</svg>

@@ -2,6 +2,11 @@
 import Layout from '../layouts/main.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
+import { getCollection } from 'astro:content';
+
+const latestPosts = (await getCollection('blog', ({ data }) => !data.draft))
+	.sort((a, b) => new Date(b.data.publishedDate).valueOf() - new Date(a.data.publishedDate).valueOf())
+	.slice(0, 3);
 ---
 
 <Layout
@@ -176,6 +181,54 @@ import Footer from '../components/Footer.astro';
 							Define custom event types and subscribe endpoints to specific events. Only deliver what's relevant.
 						</p>
 					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Blog -->
+		<section class="py-20 px-6 border-t border-surface-800/50">
+			<div class="max-w-5xl mx-auto">
+				<div class="flex items-end justify-between mb-12">
+					<div class="max-w-2xl">
+						<p class="text-sm font-medium text-brand-400 mb-3">From the blog</p>
+						<h2 class="text-3xl font-bold text-white tracking-tight">Learn about webhook delivery.</h2>
+					</div>
+					<a href="/blog" class="hidden sm:inline-flex items-center text-sm font-medium text-brand-400 hover:text-brand-200 transition-colors">
+						View all posts &rarr;
+					</a>
+				</div>
+
+				<div class="grid sm:grid-cols-3 gap-6">
+					{latestPosts.map((post) => (
+						<a href={`/blog/${post.id}`} class="group block rounded-xl border border-surface-800 bg-surface-900 overflow-hidden hover:border-surface-700 transition-colors">
+							{post.data.ogImage && (
+								<div class="aspect-[1200/630] overflow-hidden border-b border-surface-800">
+									<img src={post.data.ogImage} alt={post.data.title} class="w-full h-full object-cover" loading="lazy" />
+								</div>
+							)}
+							<div class="p-5">
+								<div class="flex flex-wrap gap-2 mb-3">
+									{post.data.tags.slice(0, 2).map((tag) => (
+										<span class="px-2 py-0.5 text-xs font-medium text-brand-400 bg-brand-500/10 border border-brand-500/20 rounded-full">
+											{tag}
+										</span>
+									))}
+								</div>
+								<h3 class="text-base font-bold text-white group-hover:text-brand-400 transition-colors leading-snug">
+									{post.data.title}
+								</h3>
+								<p class="mt-2 text-sm text-surface-400 leading-relaxed line-clamp-2">
+									{post.data.description}
+								</p>
+							</div>
+						</a>
+					))}
+				</div>
+
+				<div class="mt-8 text-center sm:hidden">
+					<a href="/blog" class="text-sm font-medium text-brand-400 hover:text-brand-200 transition-colors">
+						View all posts &rarr;
+					</a>
 				</div>
 			</div>
 		</section>

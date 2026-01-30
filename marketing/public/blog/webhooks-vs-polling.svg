@@ -1,0 +1,26 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="630" fill="#09090b"/>
+  <rect x="0" y="0" width="1200" height="4" fill="#6366f1"/>
+  <!-- Decorative -->
+  <circle cx="1080" cy="120" r="100" stroke="#6366f1" stroke-width="1" opacity="0.15"/>
+  <circle cx="180" cy="520" r="180" stroke="#1a1a1f" stroke-width="1" opacity="0.5"/>
+  <!-- Push/Pull arrows icon -->
+  <g transform="translate(100, 160)">
+    <!-- Push arrow (right) -->
+    <line x1="0" y1="20" x2="60" y2="20" stroke="#6366f1" stroke-width="3" stroke-linecap="round"/>
+    <polygon points="60,12 76,20 60,28" fill="#6366f1"/>
+    <!-- Pull arrow (left) -->
+    <line x1="76" y1="50" x2="16" y2="50" stroke="#818cf8" stroke-width="3" stroke-linecap="round"/>
+    <polygon points="16,42 0,50 16,58" fill="#818cf8"/>
+    <!-- Labels -->
+    <text x="0" y="0" font-family="JetBrains Mono, monospace" font-size="12" fill="#3f3f46">PUSH</text>
+    <text x="50" y="75" font-family="JetBrains Mono, monospace" font-size="12" fill="#3f3f46">PULL</text>
+  </g>
+  <!-- Title -->
+  <text x="100" y="320" font-family="Inter, system-ui, sans-serif" font-size="42" font-weight="700" fill="white" letter-spacing="-0.02em">Webhooks vs Polling</text>
+  <text x="100" y="375" font-family="Inter, system-ui, sans-serif" font-size="36" font-weight="700" fill="#a1a1aa" letter-spacing="-0.02em">When to Use Each</text>
+  <text x="100" y="425" font-family="Inter, system-ui, sans-serif" font-size="36" font-weight="700" fill="#a1a1aa" letter-spacing="-0.02em">and Why It Matters</text>
+  <!-- Branding -->
+  <text x="100" y="560" font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600" fill="#6366f1">Chis Blog</text>
+  <text x="100" y="585" font-family="Inter, system-ui, sans-serif" font-size="14" fill="#3f3f46">trychis.com</text>
+</svg>
