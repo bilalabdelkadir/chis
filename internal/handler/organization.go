@@ -62,6 +62,38 @@ func (h *OrganizationHandler) ListOrgs(w http.ResponseWriter, r *http.Request) e
 	return nil
 }
 
+type DeleteOrgRequest struct {
+	Name string `json:"name" validate:"required"`
+}
+
+func (h *OrganizationHandler) DeleteOrg(w http.ResponseWriter, r *http.Request) error {
+	orgID, err := extractOrgID(r)
+	if err != nil {
+		return err
+	}
+
+	var req DeleteOrgRequest
+	if err := validator.DecodeAndValidate(r, &req); err != nil {
+		return err
+	}
+
+	org, err := h.organizationRepo.FindByID(r.Context(), orgID)
+	if err != nil {
+		return apperror.NotFound("organization not found")
+	}
+
+	if req.Name != org.Name {
+		return apperror.BadRequest("organization name does not match")
+	}
+
+	if err := h.organizationRepo.Delete(r.Context(), orgID); err != nil {
+		return apperror.Internal("failed to delete organization")
+	}
+
+	response.WriteJSON(w, http.StatusOK, map[string]string{"message": "organization deleted"})
+	return nil
+}
+
 func (h *OrganizationHandler) CreateOrg(w http.ResponseWriter, r *http.Request) error {
 	userID, err := extractUserID(r)
 	if err != nil {

@@ -106,6 +106,8 @@ type MessageRepository interface {
 
 type OrganizationRepository interface {
 	Create(ctx context.Context, organization *model.Organization) error
+	FindByID(ctx context.Context, id uuid.UUID) (*model.Organization, error)
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 type PendingInvitation struct {

@@ -57,12 +57,17 @@ func Setup(r *Router,
 			r.Get("/webhook-logs", dashboardHandler.WebhookLogs)
 			r.Get("/webhook-logs/{id}", dashboardHandler.WebhookLogDetail)
 
-			// Invitation routes (admin only)
+			// Admin-only routes
 			r.Route("/invitations", func(r *Router) {
 				r.Use(middleware.RequireAdmin(membershipRepo))
 				r.Post("/", invitationHandler.CreateInvitation)
 				r.Get("/", invitationHandler.ListInvitations)
 				r.Delete("/{id}", invitationHandler.CancelInvitation)
+			})
+
+			r.Route("/org", func(r *Router) {
+				r.Use(middleware.RequireAdmin(membershipRepo))
+				r.Delete("/", orgHandler.DeleteOrg)
 			})
 		})
 	})
