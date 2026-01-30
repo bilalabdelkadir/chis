@@ -138,7 +138,7 @@ export function PlaygroundPage() {
             <div className="grid grid-cols-[120px_1fr] gap-3">
               <div className="space-y-1.5">
                 <Label>Method</Label>
-                <Select value={method} onValueChange={setMethod}>
+                <Select value={method} onValueChange={(v) => v && setMethod(v)}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
