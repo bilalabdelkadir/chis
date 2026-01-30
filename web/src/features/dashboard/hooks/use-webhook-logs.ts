@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { ApiRequestError } from "@/shared/api/api-error";
+import { useOrg } from "@/shared/context/org-context";
 import { fetchWebhookLogs } from "../api/dashboard-api";
 import type { WebhookLog } from "../types/dashboard.types";
 
 export function useWebhookLogs() {
+  const { currentOrg } = useOrg();
   const [logs, setLogs] = useState<WebhookLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +35,8 @@ export function useWebhookLogs() {
 
   // Fetch logs
   useEffect(() => {
+    if (!currentOrg) return;
+
     let cancelled = false;
 
     async function load() {
@@ -67,7 +71,7 @@ export function useWebhookLogs() {
     return () => {
       cancelled = true;
     };
-  }, [page, statusFilter, debouncedSearch]);
+  }, [page, statusFilter, debouncedSearch, currentOrg?.id]);
 
   function goToPage(p: number) {
     setPage(p);

@@ -1,6 +1,7 @@
 import { ApiRequestError, type ApiErrorBody } from './api-error';
 
 const AUTH_TOKEN_KEY = 'auth_token';
+const SELECTED_ORG_KEY = 'selected_org';
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';
 
 export function getStoredToken(): string | null {
@@ -36,6 +37,10 @@ export async function apiRequest<T>({
     const token = getStoredToken();
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+    }
+    const orgId = localStorage.getItem(SELECTED_ORG_KEY);
+    if (orgId) {
+      headers['X-Org-ID'] = orgId;
     }
   }
 

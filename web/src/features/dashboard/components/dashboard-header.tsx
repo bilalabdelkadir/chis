@@ -3,6 +3,7 @@ import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/shared/hooks/use-auth";
+import { OrgSwitcher } from "./org-switcher";
 
 export function DashboardHeader() {
   const { user, logout } = useAuth();
@@ -16,11 +17,15 @@ export function DashboardHeader() {
   return (
     <header>
       <div className="flex items-center justify-between px-8 py-5">
-        <div>
-          <p className="text-sm font-medium">
-            {user?.firstName || user?.email}
-          </p>
-          <p className="text-muted-foreground text-xs">{user?.email}</p>
+        <div className="flex items-center gap-4">
+          <OrgSwitcher />
+          <Separator orientation="vertical" className="h-6" />
+          <div>
+            <p className="text-sm font-medium">
+              {user?.firstName || user?.email}
+            </p>
+            <p className="text-muted-foreground text-xs">{user?.email}</p>
+          </div>
         </div>
         <Button variant="ghost" size="sm" onClick={handleLogout}>
           <LogOut className="size-4 text-muted-foreground" />

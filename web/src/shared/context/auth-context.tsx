@@ -50,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     removeStoredToken();
     localStorage.removeItem(AUTH_USER_KEY);
+    localStorage.removeItem("selected_org");
     setToken(null);
     setUser(null);
   }, []);

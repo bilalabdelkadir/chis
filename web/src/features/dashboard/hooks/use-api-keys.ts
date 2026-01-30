@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { ApiRequestError } from "@/shared/api/api-error";
+import { useOrg } from "@/shared/context/org-context";
 import {
   fetchApiKeys,
   createApiKey,
@@ -8,6 +9,7 @@ import {
 import type { ApiKey, CreateApiKeyResponse } from "../types/dashboard.types";
 
 export function useApiKeys() {
+  const { currentOrg } = useOrg();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
@@ -16,6 +18,8 @@ export function useApiKeys() {
     useState<CreateApiKeyResponse | null>(null);
 
   useEffect(() => {
+    if (!currentOrg) return;
+
     let cancelled = false;
 
     async function load() {
@@ -42,7 +46,7 @@ export function useApiKeys() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [currentOrg?.id]);
 
   async function createKey(name: string) {
     setIsCreating(true);
