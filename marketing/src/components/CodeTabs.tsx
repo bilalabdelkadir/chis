@@ -1,287 +1,588 @@
 import { useState } from "react";
 
-const tabs = [
+interface Tab {
+  id: string;
+  label: string;
+  lines: { text: string; cls?: string }[][];
+}
+
+const c = {
+  kw: "text-brand-400",
+  str: "text-green-400",
+  fn: "text-yellow-400",
+  cm: "text-surface-600",
+  num: "text-orange-400",
+  dim: "text-surface-400",
+  key: "text-sky-400",
+  plain: "text-surface-300",
+};
+
+const tabs: Tab[] = [
   {
     id: "typescript",
     label: "TypeScript",
-    code: `import crypto from "crypto";
-import type { Request, Response, NextFunction } from "express";
-
-export function verifyWebhook(secret: string) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const msgId = req.headers["x-webhook-id"] as string;
-    const timestamp = req.headers["x-webhook-timestamp"] as string;
-    const signature = req.headers["x-webhook-signature"] as string;
-    if (!msgId || !timestamp || !signature) {
-      return res.status(401).json({ error: "Missing webhook headers" });
-    }
-
-    const now = Math.floor(Date.now() / 1000);
-    if (Math.abs(now - parseInt(timestamp)) > 300) {
-      return res.status(401).json({ error: "Timestamp too old" });
-    }
-
-    const body = JSON.stringify(req.body);
-    const signedContent = \`\${msgId}.\${timestamp}.\${body}\`;
-    const secretBytes = Buffer.from(secret.replace("whsec_", ""), "base64");
-    const expected = crypto
-      .createHmac("sha256", secretBytes)
-      .update(signedContent)
-      .digest("base64");
-
-    const expectedSig = \`v1,\${expected}\`;
-    const signatures = signature.split(" ");
-    const valid = signatures.some(
-      (sig) =>
-        sig.length === expectedSig.length &&
-        crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))
-    );
-
-    if (!valid) return res.status(401).json({ error: "Invalid signature" });
-    next();
-  };
-}`,
+    lines: [
+      [
+        { text: "const ", cls: c.kw },
+        { text: "res ", cls: c.plain },
+        { text: "= ", cls: c.dim },
+        { text: "await ", cls: c.kw },
+        { text: "fetch", cls: c.fn },
+        { text: "(", cls: c.dim },
+        { text: '"https://api.trychis.com/v1/webhooks"', cls: c.str },
+        { text: ", {", cls: c.dim },
+      ],
+      [
+        { text: "  method", cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: '"POST"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: "  headers", cls: c.key },
+        { text: ": {", cls: c.dim },
+      ],
+      [
+        { text: '    "Authorization"', cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: "`Bearer ${", cls: c.str },
+        { text: "process.env.", cls: c.plain },
+        { text: "CHIS_API_KEY", cls: c.key },
+        { text: "}`", cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: '    "Content-Type"', cls: c.key },
+        { text: ":  ", cls: c.dim },
+        { text: '"application/json"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: "  },", cls: c.dim },
+      ],
+      [
+        { text: "  body", cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: "JSON.", cls: c.plain },
+        { text: "stringify", cls: c.fn },
+        { text: "({", cls: c.dim },
+      ],
+      [
+        { text: "    url", cls: c.key },
+        { text: ":     ", cls: c.dim },
+        { text: '"https://your-app.com/webhooks"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: "    event", cls: c.key },
+        { text: ":   ", cls: c.dim },
+        { text: '"payment.completed"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: "    payload", cls: c.key },
+        { text: ": { ", cls: c.dim },
+        { text: "amount", cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: "4999", cls: c.num },
+        { text: ", ", cls: c.dim },
+        { text: "currency", cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: '"usd"', cls: c.str },
+        { text: " },", cls: c.dim },
+      ],
+      [
+        { text: "  }),", cls: c.dim },
+      ],
+      [
+        { text: "});", cls: c.dim },
+      ],
+      [],
+      [
+        { text: "const ", cls: c.kw },
+        { text: "data", cls: c.plain },
+        { text: ": ", cls: c.dim },
+        { text: "Delivery", cls: c.fn },
+        { text: " = ", cls: c.dim },
+        { text: "await ", cls: c.kw },
+        { text: "res.", cls: c.plain },
+        { text: "json", cls: c.fn },
+        { text: "();", cls: c.dim },
+      ],
+    ],
   },
   {
     id: "nodejs",
     label: "Node.js",
-    code: `const crypto = require("crypto");
-const http = require("http");
-
-function verifyWebhook(req, body, secret) {
-  const msgId = req.headers["x-webhook-id"];
-  const timestamp = req.headers["x-webhook-timestamp"];
-  const signature = req.headers["x-webhook-signature"];
-  if (!msgId || !timestamp || !signature) return false;
-
-  const now = Math.floor(Date.now() / 1000);
-  if (Math.abs(now - parseInt(timestamp)) > 300) return false;
-
-  const signedContent = \`\${msgId}.\${timestamp}.\${body}\`;
-  const secretBytes = Buffer.from(secret.replace("whsec_", ""), "base64");
-  const expected = crypto
-    .createHmac("sha256", secretBytes)
-    .update(signedContent)
-    .digest("base64");
-
-  const expectedSig = \`v1,\${expected}\`;
-  return signature.split(" ").some(
-    (sig) =>
-      sig.length === expectedSig.length &&
-      crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))
-  );
-}`,
+    lines: [
+      [
+        { text: "const ", cls: c.kw },
+        { text: "res ", cls: c.plain },
+        { text: "= ", cls: c.dim },
+        { text: "await ", cls: c.kw },
+        { text: "fetch", cls: c.fn },
+        { text: "(", cls: c.dim },
+        { text: '"https://api.trychis.com/v1/webhooks"', cls: c.str },
+        { text: ", {", cls: c.dim },
+      ],
+      [
+        { text: "  method", cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: '"POST"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: "  headers", cls: c.key },
+        { text: ": {", cls: c.dim },
+      ],
+      [
+        { text: '    "Authorization"', cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: "`Bearer ${", cls: c.str },
+        { text: "process.env.", cls: c.plain },
+        { text: "CHIS_API_KEY", cls: c.key },
+        { text: "}`", cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: '    "Content-Type"', cls: c.key },
+        { text: ":  ", cls: c.dim },
+        { text: '"application/json"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: "  },", cls: c.dim },
+      ],
+      [
+        { text: "  body", cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: "JSON.", cls: c.plain },
+        { text: "stringify", cls: c.fn },
+        { text: "({", cls: c.dim },
+      ],
+      [
+        { text: "    url", cls: c.key },
+        { text: ":     ", cls: c.dim },
+        { text: '"https://your-app.com/webhooks"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: "    event", cls: c.key },
+        { text: ":   ", cls: c.dim },
+        { text: '"payment.completed"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: "    payload", cls: c.key },
+        { text: ": { ", cls: c.dim },
+        { text: "amount", cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: "4999", cls: c.num },
+        { text: " }", cls: c.dim },
+      ],
+      [
+        { text: "  }),", cls: c.dim },
+      ],
+      [
+        { text: "});", cls: c.dim },
+      ],
+      [],
+      [
+        { text: "const ", cls: c.kw },
+        { text: "data ", cls: c.plain },
+        { text: "= ", cls: c.dim },
+        { text: "await ", cls: c.kw },
+        { text: "res.", cls: c.plain },
+        { text: "json", cls: c.fn },
+        { text: "();", cls: c.dim },
+      ],
+    ],
   },
   {
-    id: "python-fastapi",
-    label: "Python (FastAPI)",
-    code: `import hmac, hashlib, base64, time
-from fastapi import Request, HTTPException
-
-async def verify_webhook(request: Request, secret: str):
-    msg_id = request.headers.get("x-webhook-id")
-    timestamp = request.headers.get("x-webhook-timestamp")
-    signature = request.headers.get("x-webhook-signature")
-    if not all([msg_id, timestamp, signature]):
-        raise HTTPException(401, "Missing webhook headers")
-
-    if abs(time.time() - int(timestamp)) > 300:
-        raise HTTPException(401, "Timestamp too old")
-
-    body = (await request.body()).decode()
-    signed_content = f"{msg_id}.{timestamp}.{body}"
-    secret_bytes = base64.b64decode(secret.removeprefix("whsec_"))
-    expected = base64.b64encode(
-        hmac.new(secret_bytes, signed_content.encode(), hashlib.sha256).digest()
-    ).decode()
-
-    expected_sig = f"v1,{expected}"
-    if not any(
-        hmac.compare_digest(sig, expected_sig)
-        for sig in signature.split(" ")
-    ):
-        raise HTTPException(401, "Invalid signature")`,
-  },
-  {
-    id: "python-django",
-    label: "Python (Django)",
-    code: `import hmac, hashlib, base64, time
-from django.http import JsonResponse
-
-def verify_webhook(view_func):
-    def wrapper(request, *args, **kwargs):
-        secret = settings.WEBHOOK_SECRET
-        msg_id = request.headers.get("X-Webhook-Id")
-        timestamp = request.headers.get("X-Webhook-Timestamp")
-        signature = request.headers.get("X-Webhook-Signature")
-        if not all([msg_id, timestamp, signature]):
-            return JsonResponse({"error": "Missing headers"}, status=401)
-
-        if abs(time.time() - int(timestamp)) > 300:
-            return JsonResponse({"error": "Timestamp too old"}, status=401)
-
-        body = request.body.decode()
-        signed_content = f"{msg_id}.{timestamp}.{body}"
-        secret_bytes = base64.b64decode(secret.removeprefix("whsec_"))
-        expected = base64.b64encode(
-            hmac.new(secret_bytes, signed_content.encode(), hashlib.sha256).digest()
-        ).decode()
-
-        expected_sig = f"v1,{expected}"
-        if not any(
-            hmac.compare_digest(sig, expected_sig)
-            for sig in signature.split(" ")
-        ):
-            return JsonResponse({"error": "Invalid signature"}, status=401)
-        return view_func(request, *args, **kwargs)
-    return wrapper`,
+    id: "python",
+    label: "Python",
+    lines: [
+      [
+        { text: "import ", cls: c.kw },
+        { text: "requests", cls: c.plain },
+      ],
+      [
+        { text: "import ", cls: c.kw },
+        { text: "os", cls: c.plain },
+      ],
+      [],
+      [
+        { text: "response ", cls: c.plain },
+        { text: "= ", cls: c.dim },
+        { text: "requests.", cls: c.plain },
+        { text: "post", cls: c.fn },
+        { text: "(", cls: c.dim },
+      ],
+      [
+        { text: '    "https://api.trychis.com/v1/webhooks"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: "    headers", cls: c.key },
+        { text: "={", cls: c.dim },
+      ],
+      [
+        { text: '        "Authorization"', cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: 'f"Bearer {', cls: c.str },
+        { text: "os.environ[", cls: c.plain },
+        { text: "'CHIS_API_KEY'", cls: c.str },
+        { text: "]", cls: c.plain },
+        { text: '}"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: '        "Content-Type"', cls: c.key },
+        { text: ":  ", cls: c.dim },
+        { text: '"application/json"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: "    },", cls: c.dim },
+      ],
+      [
+        { text: "    json", cls: c.key },
+        { text: "={", cls: c.dim },
+      ],
+      [
+        { text: '        "url"', cls: c.key },
+        { text: ":     ", cls: c.dim },
+        { text: '"https://your-app.com/webhooks"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: '        "event"', cls: c.key },
+        { text: ":   ", cls: c.dim },
+        { text: '"payment.completed"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: '        "payload"', cls: c.key },
+        { text: ": {", cls: c.dim },
+        { text: '"amount"', cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: "4999", cls: c.num },
+        { text: "},", cls: c.dim },
+      ],
+      [
+        { text: "    },", cls: c.dim },
+      ],
+      [
+        { text: ")", cls: c.dim },
+      ],
+      [],
+      [
+        { text: "print", cls: c.fn },
+        { text: "(", cls: c.dim },
+        { text: "response.", cls: c.plain },
+        { text: "json", cls: c.fn },
+        { text: "())", cls: c.dim },
+      ],
+    ],
   },
   {
     id: "go",
     label: "Go",
-    code: `package main
-
-import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
-	"fmt"
-	"math"
-	"net/http"
-	"strings"
-	"time"
-)
-
-func verifyWebhook(r *http.Request, body []byte, secret string) error {
-	msgId := r.Header.Get("X-Webhook-Id")
-	timestamp := r.Header.Get("X-Webhook-Timestamp")
-	signature := r.Header.Get("X-Webhook-Signature")
-	if msgId == "" || timestamp == "" || signature == "" {
-		return fmt.Errorf("missing webhook headers")
-	}
-
-	ts, _ := strconv.ParseInt(timestamp, 10, 64)
-	if math.Abs(float64(time.Now().Unix()-ts)) > 300 {
-		return fmt.Errorf("timestamp too old")
-	}
-
-	signedContent := fmt.Sprintf("%s.%s.%s", msgId, timestamp, string(body))
-	secretBytes, _ := base64.StdEncoding.DecodeString(
-		strings.TrimPrefix(secret, "whsec_"),
-	)
-	mac := hmac.New(sha256.New, secretBytes)
-	mac.Write([]byte(signedContent))
-	expected := "v1," + base64.StdEncoding.EncodeToString(mac.Sum(nil))
-
-	for _, sig := range strings.Split(signature, " ") {
-		if hmac.Equal([]byte(sig), []byte(expected)) {
-			return nil
-		}
-	}
-	return fmt.Errorf("invalid signature")
-}`,
+    lines: [
+      [
+        { text: "body ", cls: c.plain },
+        { text: ":= ", cls: c.dim },
+        { text: "strings.", cls: c.plain },
+        { text: "NewReader", cls: c.fn },
+        { text: "(", cls: c.dim },
+        { text: "`{", cls: c.str },
+      ],
+      [
+        { text: '  "url":     "https://your-app.com/webhooks",', cls: c.str },
+      ],
+      [
+        { text: '  "event":   "payment.completed",', cls: c.str },
+      ],
+      [
+        { text: '  "payload": {"amount": 4999}', cls: c.str },
+      ],
+      [
+        { text: "}`", cls: c.str },
+        { text: ")", cls: c.dim },
+      ],
+      [],
+      [
+        { text: "req, _ ", cls: c.plain },
+        { text: ":= ", cls: c.dim },
+        { text: "http.", cls: c.plain },
+        { text: "NewRequest", cls: c.fn },
+        { text: "(", cls: c.dim },
+        { text: '"POST"', cls: c.str },
+        { text: ", ", cls: c.dim },
+        { text: '"https://api.trychis.com/v1/webhooks"', cls: c.str },
+        { text: ", body)", cls: c.dim },
+      ],
+      [
+        { text: "req.", cls: c.plain },
+        { text: "Header.", cls: c.plain },
+        { text: "Set", cls: c.fn },
+        { text: "(", cls: c.dim },
+        { text: '"Authorization"', cls: c.str },
+        { text: ", ", cls: c.dim },
+        { text: '"Bearer "', cls: c.str },
+        { text: " + ", cls: c.dim },
+        { text: "os.", cls: c.plain },
+        { text: "Getenv", cls: c.fn },
+        { text: "(", cls: c.dim },
+        { text: '"CHIS_API_KEY"', cls: c.str },
+        { text: "))", cls: c.dim },
+      ],
+      [
+        { text: "req.", cls: c.plain },
+        { text: "Header.", cls: c.plain },
+        { text: "Set", cls: c.fn },
+        { text: "(", cls: c.dim },
+        { text: '"Content-Type"', cls: c.str },
+        { text: ", ", cls: c.dim },
+        { text: '"application/json"', cls: c.str },
+        { text: ")", cls: c.dim },
+      ],
+      [],
+      [
+        { text: "resp, _ ", cls: c.plain },
+        { text: ":= ", cls: c.dim },
+        { text: "http.", cls: c.plain },
+        { text: "DefaultClient.", cls: c.plain },
+        { text: "Do", cls: c.fn },
+        { text: "(req)", cls: c.dim },
+      ],
+      [
+        { text: "defer ", cls: c.kw },
+        { text: "resp.", cls: c.plain },
+        { text: "Body.", cls: c.plain },
+        { text: "Close", cls: c.fn },
+        { text: "()", cls: c.dim },
+      ],
+    ],
   },
   {
-    id: "java",
-    label: "Java (Spring)",
-    code: `import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
-import java.util.Base64;
-
-@RestController
-public class WebhookController {
-
-    @PostMapping("/webhook")
-    public ResponseEntity<String> handleWebhook(
-            @RequestHeader("X-Webhook-Id") String msgId,
-            @RequestHeader("X-Webhook-Timestamp") String timestamp,
-            @RequestHeader("X-Webhook-Signature") String signature,
-            @RequestBody String body) throws Exception {
-
-        long now = System.currentTimeMillis() / 1000;
-        if (Math.abs(now - Long.parseLong(timestamp)) > 300) {
-            return ResponseEntity.status(401).body("Timestamp too old");
-        }
-
-        String secret = System.getenv("WEBHOOK_SECRET");
-        byte[] secretBytes = Base64.getDecoder().decode(
-            secret.replaceFirst("^whsec_", "")
-        );
-        String signedContent = msgId + "." + timestamp + "." + body;
-
-        Mac mac = Mac.getInstance("HmacSHA256");
-        mac.init(new SecretKeySpec(secretBytes, "HmacSHA256"));
-        String expected = "v1," + Base64.getEncoder().encodeToString(
-            mac.doFinal(signedContent.getBytes())
-        );
-
-        boolean valid = false;
-        for (String sig : signature.split(" ")) {
-            if (MessageDigest.isEqual(sig.getBytes(), expected.getBytes())) {
-                valid = true;
-                break;
-            }
-        }
-        if (!valid) return ResponseEntity.status(401).body("Invalid signature");
-        return ResponseEntity.ok("OK");
-    }
-}`,
+    id: "ruby",
+    label: "Ruby",
+    lines: [
+      [
+        { text: "require ", cls: c.kw },
+        { text: '"net/http"', cls: c.str },
+      ],
+      [
+        { text: "require ", cls: c.kw },
+        { text: '"json"', cls: c.str },
+      ],
+      [],
+      [
+        { text: "uri ", cls: c.plain },
+        { text: "= ", cls: c.dim },
+        { text: "URI", cls: c.fn },
+        { text: "(", cls: c.dim },
+        { text: '"https://api.trychis.com/v1/webhooks"', cls: c.str },
+        { text: ")", cls: c.dim },
+      ],
+      [
+        { text: "req ", cls: c.plain },
+        { text: "= ", cls: c.dim },
+        { text: "Net::HTTP::Post.", cls: c.plain },
+        { text: "new", cls: c.fn },
+        { text: "(uri)", cls: c.dim },
+      ],
+      [],
+      [
+        { text: 'req["Authorization"] ', cls: c.key },
+        { text: "= ", cls: c.dim },
+        { text: '"Bearer #{', cls: c.str },
+        { text: "ENV[", cls: c.plain },
+        { text: "'CHIS_API_KEY'", cls: c.str },
+        { text: "]", cls: c.plain },
+        { text: '}"', cls: c.str },
+      ],
+      [
+        { text: 'req["Content-Type"]  ', cls: c.key },
+        { text: "= ", cls: c.dim },
+        { text: '"application/json"', cls: c.str },
+      ],
+      [
+        { text: "req.", cls: c.plain },
+        { text: "body ", cls: c.key },
+        { text: "= {", cls: c.dim },
+      ],
+      [
+        { text: "  url", cls: c.key },
+        { text: ":     ", cls: c.dim },
+        { text: '"https://your-app.com/webhooks"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: "  event", cls: c.key },
+        { text: ":   ", cls: c.dim },
+        { text: '"payment.completed"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: "  payload", cls: c.key },
+        { text: ": { ", cls: c.dim },
+        { text: "amount", cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: "4999", cls: c.num },
+        { text: " }", cls: c.dim },
+      ],
+      [
+        { text: "}.", cls: c.dim },
+        { text: "to_json", cls: c.fn },
+      ],
+      [],
+      [
+        { text: "res ", cls: c.plain },
+        { text: "= ", cls: c.dim },
+        { text: "Net::HTTP.", cls: c.plain },
+        { text: "start", cls: c.fn },
+        { text: "(uri.host, uri.port, ", cls: c.dim },
+        { text: "use_ssl", cls: c.key },
+        { text: ": ", cls: c.dim },
+        { text: "true", cls: c.kw },
+        { text: ") { |h| h.", cls: c.dim },
+        { text: "request", cls: c.fn },
+        { text: "(req) }", cls: c.dim },
+      ],
+      [
+        { text: "puts ", cls: c.fn },
+        { text: "res.", cls: c.plain },
+        { text: "body", cls: c.key },
+      ],
+    ],
   },
   {
     id: "php",
-    label: "PHP (Laravel)",
-    code: `<?php
-
-namespace App\\Http\\Middleware;
-
-use Closure;
-use Illuminate\\Http\\Request;
-
-class VerifyWebhook
-{
-    public function handle(Request $request, Closure $next)
-    {
-        $msgId = $request->header('X-Webhook-Id');
-        $timestamp = $request->header('X-Webhook-Timestamp');
-        $signature = $request->header('X-Webhook-Signature');
-        if (!$msgId || !$timestamp || !$signature) {
-            return response()->json(['error' => 'Missing headers'], 401);
-        }
-
-        if (abs(time() - intval($timestamp)) > 300) {
-            return response()->json(['error' => 'Timestamp too old'], 401);
-        }
-
-        $body = $request->getContent();
-        $signedContent = "{$msgId}.{$timestamp}.{$body}";
-        $secret = config('services.webhook.secret');
-        $secretBytes = base64_decode(
-            str_replace('whsec_', '', $secret)
-        );
-        $expected = 'v1,' . base64_encode(
-            hash_hmac('sha256', $signedContent, $secretBytes, true)
-        );
-
-        $valid = collect(explode(' ', $signature))
-            ->contains(fn ($sig) => hash_equals($expected, $sig));
-
-        if (!$valid) {
-            return response()->json(['error' => 'Invalid signature'], 401);
-        }
-        return $next($request);
-    }
-}`,
+    label: "PHP",
+    lines: [
+      [
+        { text: "$response ", cls: c.plain },
+        { text: "= ", cls: c.dim },
+        { text: "Http", cls: c.fn },
+        { text: "::", cls: c.dim },
+        { text: "withHeaders", cls: c.fn },
+        { text: "([", cls: c.dim },
+      ],
+      [
+        { text: '    "Authorization" ', cls: c.key },
+        { text: "=> ", cls: c.dim },
+        { text: '"Bearer "', cls: c.str },
+        { text: " . ", cls: c.dim },
+        { text: "env", cls: c.fn },
+        { text: "(", cls: c.dim },
+        { text: '"CHIS_API_KEY"', cls: c.str },
+        { text: "),", cls: c.dim },
+      ],
+      [
+        { text: "])", cls: c.dim },
+        { text: "->", cls: c.dim },
+        { text: "post", cls: c.fn },
+        { text: "(", cls: c.dim },
+        { text: '"https://api.trychis.com/v1/webhooks"', cls: c.str },
+        { text: ", [", cls: c.dim },
+      ],
+      [
+        { text: '    "url"     ', cls: c.key },
+        { text: "=> ", cls: c.dim },
+        { text: '"https://your-app.com/webhooks"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: '    "event"   ', cls: c.key },
+        { text: "=> ", cls: c.dim },
+        { text: '"payment.completed"', cls: c.str },
+        { text: ",", cls: c.dim },
+      ],
+      [
+        { text: '    "payload" ', cls: c.key },
+        { text: "=> [", cls: c.dim },
+        { text: '"amount"', cls: c.key },
+        { text: " => ", cls: c.dim },
+        { text: "4999", cls: c.num },
+        { text: "],", cls: c.dim },
+      ],
+      [
+        { text: "]);", cls: c.dim },
+      ],
+      [],
+      [
+        { text: "$data ", cls: c.plain },
+        { text: "= ", cls: c.dim },
+        { text: "$response", cls: c.plain },
+        { text: "->", cls: c.dim },
+        { text: "json", cls: c.fn },
+        { text: "();", cls: c.dim },
+      ],
+    ],
+  },
+  {
+    id: "curl",
+    label: "cURL",
+    lines: [
+      [
+        { text: "curl", cls: c.fn },
+        { text: " -X POST ", cls: c.dim },
+        { text: "https://api.trychis.com/v1/webhooks", cls: c.plain },
+        { text: " \\", cls: c.dim },
+      ],
+      [
+        { text: "  -H ", cls: c.dim },
+        { text: '"Authorization: Bearer $CHIS_API_KEY"', cls: c.str },
+        { text: " \\", cls: c.dim },
+      ],
+      [
+        { text: "  -H ", cls: c.dim },
+        { text: '"Content-Type: application/json"', cls: c.str },
+        { text: " \\", cls: c.dim },
+      ],
+      [
+        { text: "  -d ", cls: c.dim },
+        { text: "'{", cls: c.str },
+      ],
+      [
+        { text: '    "url":     "https://your-app.com/webhooks",', cls: c.str },
+      ],
+      [
+        { text: '    "event":   "payment.completed",', cls: c.str },
+      ],
+      [
+        { text: '    "payload": { "amount": 4999 }', cls: c.str },
+      ],
+      [
+        { text: "  }'", cls: c.str },
+      ],
+    ],
   },
 ];
+
+function renderLine(segments: { text: string; cls?: string }[]) {
+  return segments.map((seg, i) =>
+    seg.cls ? (
+      <span key={i} className={seg.cls}>{seg.text}</span>
+    ) : (
+      <span key={i}>{seg.text}</span>
+    )
+  );
+}
 
 export default function CodeTabs() {
   const [activeTab, setActiveTab] = useState("typescript");
   const [copied, setCopied] = useState(false);
 
   const activeSnippet = tabs.find((t) => t.id === activeTab)!;
+  const plainText = activeSnippet.lines
+    .map((segs) => segs.map((s) => s.text).join(""))
+    .join("\n");
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(activeSnippet.code);
+    await navigator.clipboard.writeText(plainText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -289,11 +590,11 @@ export default function CodeTabs() {
   return (
     <div className="rounded-xl border border-surface-800 bg-surface-900 overflow-hidden">
       <div className="flex items-center border-b border-surface-800">
-        <div className="flex-1 flex overflow-x-auto">
+        <div className="flex-1 flex overflow-x-auto scrollbar-none">
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => { setActiveTab(tab.id); setCopied(false); }}
               className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
                 activeTab === tab.id
                   ? "text-brand-400 border-b-2 border-brand-400"
@@ -312,7 +613,13 @@ export default function CodeTabs() {
         </button>
       </div>
       <pre className="p-5 text-sm leading-relaxed overflow-x-auto font-mono">
-        <code className="text-surface-300">{activeSnippet.code}</code>
+        <code>
+          {activeSnippet.lines.map((segs, i) => (
+            <span key={i}>
+              {segs.length === 0 ? "\n" : <>{renderLine(segs)}{"\n"}</>}
+            </span>
+          ))}
+        </code>
       </pre>
     </div>
   );

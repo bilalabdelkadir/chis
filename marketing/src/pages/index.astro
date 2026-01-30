@@ -2,6 +2,7 @@
 import Layout from '../layouts/main.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
+import CodeTabs from '../components/CodeTabs';
 import { getCollection } from 'astro:content';
 
 const latestPosts = (await getCollection('blog', ({ data }) => !data.draft))
@@ -148,13 +149,13 @@ const latestPosts = (await getCollection('blog', ({ data }) => !data.draft))
 					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
 						<h3 class="text-white font-medium mb-2">Automatic retries</h3>
 						<p class="text-sm text-surface-400 leading-relaxed">
-							Failed deliveries are retried with exponential backoff. Configure max attempts and intervals to fit your use case.
+							Failed deliveries are retried with exponential backoff. Up to 5 attempts with increasing delays so transient failures resolve themselves.
 						</p>
 					</div>
 					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
 						<h3 class="text-white font-medium mb-2">Delivery logs</h3>
 						<p class="text-sm text-surface-400 leading-relaxed">
-							Full request/response logs for every delivery attempt. Status codes, headers, timing — all searchable.
+							Full request/response logs for every delivery attempt. Status codes, response bodies, error messages, and timing — all searchable from the dashboard.
 						</p>
 					</div>
 					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
@@ -166,21 +167,49 @@ const latestPosts = (await getCollection('blog', ({ data }) => !data.draft))
 					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
 						<h3 class="text-white font-medium mb-2">API-first</h3>
 						<p class="text-sm text-surface-400 leading-relaxed">
-							Everything is an API. Create endpoints, send events, and query logs programmatically. No UI required.
+							Everything is an API. Send events, manage API keys, rotate signing secrets, and query logs programmatically. No UI required.
 						</p>
 					</div>
 					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
-						<h3 class="text-white font-medium mb-2">Signature verification</h3>
+						<h3 class="text-white font-medium mb-2">HMAC-SHA256 signing</h3>
 						<p class="text-sm text-surface-400 leading-relaxed">
-							Every webhook is signed with HMAC-SHA256. Your consumers can verify payloads are authentic and untampered.
+							Every delivery is signed with a per-organization secret following the Standard Webhooks format. Receivers verify authenticity with <code class="text-xs text-brand-300">X-Webhook-Signature</code> headers. Rotate secrets from the dashboard at any time.
 						</p>
 					</div>
 					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
-						<h3 class="text-white font-medium mb-2">Event types</h3>
+						<h3 class="text-white font-medium mb-2">Multi-tenant organizations</h3>
 						<p class="text-sm text-surface-400 leading-relaxed">
-							Define custom event types and subscribe endpoints to specific events. Only deliver what's relevant.
+							Create separate organizations for each project or team. API keys, webhook logs, and signing secrets are fully isolated per organization.
 						</p>
 					</div>
+					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
+						<h3 class="text-white font-medium mb-2">Team invitations</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							Invite team members by email with admin or member roles. Manage access, accept or decline invitations, and collaborate across your organization.
+						</p>
+					</div>
+					<div class="rounded-xl border border-surface-800 bg-surface-900 p-6">
+						<h3 class="text-white font-medium mb-2">Dashboard & monitoring</h3>
+						<p class="text-sm text-surface-400 leading-relaxed">
+							A real-time dashboard with delivery stats, success rates, filterable webhook logs, and per-attempt detail views. Manage API keys and secrets from one place.
+						</p>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- SDK -->
+		<section class="py-20 px-6 border-t border-surface-800/50">
+			<div class="max-w-5xl mx-auto">
+				<div class="max-w-2xl">
+					<p class="text-sm font-medium text-brand-400 mb-3">Integrate</p>
+					<h2 class="text-3xl font-bold text-white tracking-tight">Send from your stack.</h2>
+					<p class="mt-4 text-surface-400 leading-relaxed">
+						One API call to send a webhook. Pick your language, copy the snippet, and start delivering events in minutes.
+					</p>
+				</div>
+				<div class="mt-12">
+					<CodeTabs client:load />
 				</div>
 			</div>
 		</section>
