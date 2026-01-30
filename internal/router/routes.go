@@ -11,7 +11,9 @@ func Setup(r *Router,
 	apiKeyHandler *handler.ApiKeyHandler,
 	webhookHandler *handler.WebhookHandler,
 	dashboardHandler *handler.DashboardHandler,
+	orgHandler *handler.OrganizationHandler,
 	apiKeyRepo repository.ApiKeyRepository,
+	membershipRepo repository.MembershipRepository,
 	secret string,
 ) {
 	// Public routes - no auth required
@@ -28,17 +30,26 @@ func Setup(r *Router,
 	r.Route("/api", func(r *Router) {
 		r.Use(middleware.ValidateToken(secret))
 
-		r.Route("/api-key", func(r *Router) {
-			r.Post("/create", apiKeyHandler.Create)
-			r.Get("/list", apiKeyHandler.List)
-			r.Delete("/{id}", apiKeyHandler.Delete)
-		})
+		// Org management routes (no org context needed)
+		r.Get("/orgs", orgHandler.ListOrgs)
+		r.Post("/orgs", orgHandler.CreateOrg)
 
-		r.Route("/dashboard", func(r *Router) {
-			r.Get("/stats", dashboardHandler.Stats)
-		})
+		// Org-scoped routes (require X-Org-ID header)
+		r.Route("/", func(r *Router) {
+			r.Use(middleware.ValidateOrgAccess(membershipRepo))
 
-		r.Get("/webhook-logs", dashboardHandler.WebhookLogs)
-		r.Get("/webhook-logs/{id}", dashboardHandler.WebhookLogDetail)
+			r.Route("/api-key", func(r *Router) {
+				r.Post("/create", apiKeyHandler.Create)
+				r.Get("/list", apiKeyHandler.List)
+				r.Delete("/{id}", apiKeyHandler.Delete)
+			})
+
+			r.Route("/dashboard", func(r *Router) {
+				r.Get("/stats", dashboardHandler.Stats)
+			})
+
+			r.Get("/webhook-logs", dashboardHandler.WebhookLogs)
+			r.Get("/webhook-logs/{id}", dashboardHandler.WebhookLogDetail)
+		})
 	})
 }

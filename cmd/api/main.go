@@ -67,9 +67,10 @@ func main() {
 
 	// Handlers
 	authHandler := handler.NewAuthHandler(userRepo, accountRepo, orgRepo, membershipRepo, cfg.JwtSecret)
-	apiKeyHandler := handler.NewApiKeyHandler(membershipRepo, apiKeyRepo)
+	apiKeyHandler := handler.NewApiKeyHandler(apiKeyRepo)
 	webhookHandler := handler.NewWebhookHandler(deliveryClient)
-	dashboardHandler := handler.NewDashboardHandler(membershipRepo, messageRepo, deliveryAttemptRepo)
+	dashboardHandler := handler.NewDashboardHandler(messageRepo, deliveryAttemptRepo)
+	orgHandler := handler.NewOrganizationHandler(orgRepo, membershipRepo)
 
 	// Router
 	r := router.NewRouter()
@@ -83,7 +84,7 @@ func main() {
 		http.ListenAndServe(":9090", mux)
 	}()
 
-	router.Setup(r, authHandler, apiKeyHandler, webhookHandler, dashboardHandler, apiKeyRepo, cfg.JwtSecret)
+	router.Setup(r, authHandler, apiKeyHandler, webhookHandler, dashboardHandler, orgHandler, apiKeyRepo, membershipRepo, cfg.JwtSecret)
 
 	slog.Info("server starting", "port", cfg.Port)
 	err = http.ListenAndServe(":"+cfg.Port, r)

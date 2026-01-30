@@ -13,35 +13,27 @@ import (
 )
 
 type DashboardHandler struct {
-	membershipRepo      repository.MembershipRepository
 	messageRepo         repository.MessageRepository
 	deliveryAttemptRepo repository.DeliveryAttemptRepository
 }
 
 func NewDashboardHandler(
-	membershipRepo repository.MembershipRepository,
 	messageRepo repository.MessageRepository,
 	deliveryAttemptRepo repository.DeliveryAttemptRepository,
 ) *DashboardHandler {
 	return &DashboardHandler{
-		membershipRepo:      membershipRepo,
 		messageRepo:         messageRepo,
 		deliveryAttemptRepo: deliveryAttemptRepo,
 	}
 }
 
 func (h *DashboardHandler) Stats(w http.ResponseWriter, r *http.Request) error {
-	userID, err := extractUserID(r)
+	orgID, err := extractOrgID(r)
 	if err != nil {
 		return err
 	}
 
-	membership, err := h.membershipRepo.FindByUserID(r.Context(), userID)
-	if err != nil {
-		return apperror.NotFound("membership not found")
-	}
-
-	stats, err := h.messageRepo.GetStatsByOrgID(r.Context(), membership.OrgID)
+	stats, err := h.messageRepo.GetStatsByOrgID(r.Context(), orgID)
 	if err != nil {
 		return apperror.Internal("failed to fetch dashboard stats")
 	}
@@ -51,14 +43,9 @@ func (h *DashboardHandler) Stats(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *DashboardHandler) WebhookLogs(w http.ResponseWriter, r *http.Request) error {
-	userID, err := extractUserID(r)
+	orgID, err := extractOrgID(r)
 	if err != nil {
 		return err
-	}
-
-	membership, err := h.membershipRepo.FindByUserID(r.Context(), userID)
-	if err != nil {
-		return apperror.NotFound("membership not found")
 	}
 
 	query := r.URL.Query()
@@ -79,7 +66,7 @@ func (h *DashboardHandler) WebhookLogs(w http.ResponseWriter, r *http.Request) e
 		}
 	}
 
-	result, err := h.messageRepo.FindWebhookLogs(r.Context(), membership.OrgID, status, search, page, limit)
+	result, err := h.messageRepo.FindWebhookLogs(r.Context(), orgID, status, search, page, limit)
 	if err != nil {
 		return apperror.Internal("failed to fetch webhook logs")
 	}
@@ -89,14 +76,9 @@ func (h *DashboardHandler) WebhookLogs(w http.ResponseWriter, r *http.Request) e
 }
 
 func (h *DashboardHandler) WebhookLogDetail(w http.ResponseWriter, r *http.Request) error {
-	userID, err := extractUserID(r)
+	orgID, err := extractOrgID(r)
 	if err != nil {
 		return err
-	}
-
-	membership, err := h.membershipRepo.FindByUserID(r.Context(), userID)
-	if err != nil {
-		return apperror.NotFound("membership not found")
 	}
 
 	idParam := chi.URLParam(r, "id")
@@ -110,7 +92,7 @@ func (h *DashboardHandler) WebhookLogDetail(w http.ResponseWriter, r *http.Reque
 		return apperror.NotFound("webhook log not found")
 	}
 
-	if msg.OrgID != membership.OrgID {
+	if msg.OrgID != orgID {
 		return apperror.NotFound("webhook log not found")
 	}
 
@@ -165,4 +147,16 @@ func extractUserID(r *http.Request) (uuid.UUID, error) {
 		return uuid.Nil, apperror.Unauthorized("invalid user ID type")
 	}
 	return userID, nil
+}
+
+func extractOrgID(r *http.Request) (uuid.UUID, error) {
+	val := r.Context().Value(middleware.OrgIDKey)
+	if val == nil {
+		return uuid.Nil, apperror.BadRequest("organization not found in context")
+	}
+	orgID, ok := val.(uuid.UUID)
+	if !ok {
+		return uuid.Nil, apperror.BadRequest("invalid organization ID type")
+	}
+	return orgID, nil
 }

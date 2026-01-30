@@ -52,9 +52,18 @@ type WebhookLogDetail struct {
 	NextRetryAt     *string                `json:"nextRetryAt"`
 	DeliveryAttempts []DeliveryAttemptDetail `json:"deliveryAttempts"`
 }
+type MembershipWithOrg struct {
+	OrgID   uuid.UUID `json:"id"`
+	OrgName string    `json:"name"`
+	OrgSlug string    `json:"slug"`
+	Role    string    `json:"role"`
+}
+
 type MembershipRepository interface {
 	Create(ctx context.Context, membership *model.Membership) error
 	FindByUserID(ctx context.Context, userID uuid.UUID) (*model.Membership, error)
+	FindAllByUserID(ctx context.Context, userID uuid.UUID) ([]*MembershipWithOrg, error)
+	FindByUserAndOrgID(ctx context.Context, userID, orgID uuid.UUID) (*model.Membership, error)
 }
 
 type MessageStats struct {

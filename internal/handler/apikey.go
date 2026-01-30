@@ -4,7 +4,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/bilalabdelkadir/chis/internal/middleware"
 	"github.com/bilalabdelkadir/chis/internal/model"
 	"github.com/bilalabdelkadir/chis/internal/repository"
 	"github.com/bilalabdelkadir/chis/pkg/apperror"
@@ -16,18 +15,14 @@ import (
 )
 
 type ApiKeyHandler struct {
-	membershipRepo repository.MembershipRepository
-	apiKeyRepo     repository.ApiKeyRepository
+	apiKeyRepo repository.ApiKeyRepository
 }
 
 func NewApiKeyHandler(
-	membershipRepo repository.MembershipRepository,
 	apiKeyRepo repository.ApiKeyRepository,
-
 ) *ApiKeyHandler {
 	return &ApiKeyHandler{
-		membershipRepo: membershipRepo,
-		apiKeyRepo:     apiKeyRepo,
+		apiKeyRepo: apiKeyRepo,
 	}
 }
 
@@ -60,18 +55,9 @@ func (h *ApiKeyHandler) Create(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 
-	userIdValue := r.Context().Value(middleware.UserIDKey)
-	if userIdValue == nil {
-		return apperror.Unauthorized("user not found in context")
-	}
-	userId, ok := userIdValue.(uuid.UUID)
-	if !ok {
-		return apperror.Unauthorized("invalid user ID type")
-	}
-
-	membership, err := h.membershipRepo.FindByUserID(r.Context(), userId)
+	orgID, err := extractOrgID(r)
 	if err != nil {
-		return apperror.NotFound("membership not found")
+		return err
 	}
 
 	fullApiKey, err := helper.GenerateRandomApiKey("chis_sk_")
@@ -88,7 +74,7 @@ func (h *ApiKeyHandler) Create(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	apiKey := &model.APIKey{
-		OrgID:     membership.OrgID,
+		OrgID:     orgID,
 		Name:      req.Name,
 		Prefix:    displayPrefix,
 		HashedKey: hashKey,
@@ -113,17 +99,12 @@ func (h *ApiKeyHandler) Create(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (h *ApiKeyHandler) List(w http.ResponseWriter, r *http.Request) error {
-	userID, err := extractUserID(r)
+	orgID, err := extractOrgID(r)
 	if err != nil {
 		return err
 	}
 
-	membership, err := h.membershipRepo.FindByUserID(r.Context(), userID)
-	if err != nil {
-		return apperror.NotFound("membership not found")
-	}
-
-	keys, err := h.apiKeyRepo.FindByOrgID(r.Context(), membership.OrgID)
+	keys, err := h.apiKeyRepo.FindByOrgID(r.Context(), orgID)
 	if err != nil {
 		return apperror.Internal("failed to fetch api keys")
 	}
