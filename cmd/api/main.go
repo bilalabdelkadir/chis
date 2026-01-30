@@ -55,6 +55,7 @@ func main() {
 	membershipRepo := repository.NewMembershipRepository(pool)
 	apiKeyRepo := repository.NewApiKeyRepository(pool)
 	messageRepo := repository.NewMessageRepository(pool)
+	deliveryAttemptRepo := repository.NewDeliveryAttemptsRepository(pool)
 
 	conn, err := grpc.NewClient(cfg.GrpcAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -68,7 +69,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(userRepo, accountRepo, orgRepo, membershipRepo, cfg.JwtSecret)
 	apiKeyHandler := handler.NewApiKeyHandler(membershipRepo, apiKeyRepo)
 	webhookHandler := handler.NewWebhookHandler(deliveryClient)
-	dashboardHandler := handler.NewDashboardHandler(membershipRepo, messageRepo)
+	dashboardHandler := handler.NewDashboardHandler(membershipRepo, messageRepo, deliveryAttemptRepo)
 
 	// Router
 	r := router.NewRouter()

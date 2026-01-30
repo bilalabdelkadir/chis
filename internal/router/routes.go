@@ -39,5 +39,6 @@ func Setup(r *Router,
 		})
 
 		r.Get("/webhook-logs", dashboardHandler.WebhookLogs)
+		r.Get("/webhook-logs/{id}", dashboardHandler.WebhookLogDetail)
 	})
 }

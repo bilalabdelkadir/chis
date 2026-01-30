@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/bilalabdelkadir/chis/internal/model"
 	"github.com/google/uuid"
@@ -26,6 +27,30 @@ type ApiKeyRepository interface {
 
 type DeliveryAttemptRepository interface {
 	Create(ctx context.Context, deliveryAttempt *model.DeliveryAttempt) error
+	FindByMessageID(ctx context.Context, messageID uuid.UUID) ([]*model.DeliveryAttempt, error)
+}
+
+type DeliveryAttemptDetail struct {
+	ID            uuid.UUID `json:"id"`
+	AttemptNumber int       `json:"attemptNumber"`
+	StatusCode    *int      `json:"statusCode"`
+	ResponseBody  *string   `json:"responseBody"`
+	ErrorMessage  *string   `json:"errorMessage"`
+	DurationMS    *int      `json:"durationMs"`
+	AttemptedAt   string    `json:"attemptedAt"`
+}
+
+type WebhookLogDetail struct {
+	ID              uuid.UUID              `json:"id"`
+	Method          string                 `json:"method"`
+	URL             string                 `json:"url"`
+	Status          string                 `json:"status"`
+	Payload         json.RawMessage        `json:"payload"`
+	AttemptCount    int                    `json:"attemptCount"`
+	CreatedAt       string                 `json:"createdAt"`
+	UpdatedAt       string                 `json:"updatedAt"`
+	NextRetryAt     *string                `json:"nextRetryAt"`
+	DeliveryAttempts []DeliveryAttemptDetail `json:"deliveryAttempts"`
 }
 type MembershipRepository interface {
 	Create(ctx context.Context, membership *model.Membership) error
