@@ -12,5 +12,11 @@ export default defineConfig({
   vite: {
     plugins: [tailwindcss()],
   },
-  integrations: [react(), mdx(), sitemap()],
+  integrations: [react(), mdx(), sitemap({
+    serialize(item) {
+      // Add lastmod to help Google prioritize crawling
+      item.lastmod = new Date().toISOString();
+      return item;
+    },
+  })],
 });

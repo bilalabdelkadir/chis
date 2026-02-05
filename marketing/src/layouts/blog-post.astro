@@ -3,6 +3,16 @@ import Layout from './main.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 
+interface RelatedPost {
+	id: string;
+	data: {
+		title: string;
+		description: string;
+		tags: string[];
+		publishedDate: string;
+	};
+}
+
 interface Props {
 	title: string;
 	description: string;
@@ -12,9 +22,10 @@ interface Props {
 	tags: string[];
 	keywords: string[];
 	ogImage?: string;
+	relatedPosts?: RelatedPost[];
 }
 
-const { title, description, publishedDate, modifiedDate, author, tags, keywords, ogImage } = Astro.props;
+const { title, description, publishedDate, modifiedDate, author, tags, keywords, ogImage, relatedPosts = [] } = Astro.props;
 
 const articleJsonLd = {
 	"@context": "https://schema.org",
@@ -82,7 +93,32 @@ const articleJsonLd = {
 				<slot />
 			</div>
 
-			<div class="mt-16 rounded-xl border border-surface-800 bg-surface-900 p-8 text-center">
+			{relatedPosts.length > 0 && (
+			<nav class="mt-16" aria-label="Related articles">
+				<h2 class="text-xl font-bold text-white mb-6">Related Articles</h2>
+				<div class="grid sm:grid-cols-3 gap-4">
+					{relatedPosts.map((related) => (
+						<a href={`/blog/${related.id}`} class="group block rounded-xl border border-surface-800 bg-surface-900 p-5 hover:border-surface-700 transition-colors">
+							<div class="flex flex-wrap gap-1.5 mb-2">
+								{related.data.tags.slice(0, 2).map((tag) => (
+									<span class="px-2 py-0.5 text-xs font-medium text-brand-400 bg-brand-500/10 border border-brand-500/20 rounded-full">
+										{tag}
+									</span>
+								))}
+							</div>
+							<h3 class="text-sm font-semibold text-white group-hover:text-brand-400 transition-colors leading-snug">
+								{related.data.title}
+							</h3>
+							<time datetime={related.data.publishedDate} class="mt-2 block text-xs text-surface-500">
+								{new Date(related.data.publishedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+							</time>
+						</a>
+					))}
+				</div>
+			</nav>
+		)}
+
+		<div class="mt-16 rounded-xl border border-surface-800 bg-surface-900 p-8 text-center">
 				<h2 class="text-2xl font-bold text-white">Ready to stop building webhook plumbing?</h2>
 				<p class="mt-3 text-surface-400">
 					Chis handles retries, logging, and delivery confirmation so you can focus on your product.

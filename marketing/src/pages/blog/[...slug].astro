@@ -6,12 +6,23 @@ export async function getStaticPaths() {
 	const posts = await getCollection('blog', ({ data }) => !data.draft);
 	return posts.map((post) => ({
 		params: { slug: post.id },
-		props: { post },
+		props: { post, allPosts: posts },
 	}));
 }
 
-const { post } = Astro.props;
+const { post, allPosts } = Astro.props;
 const { Content } = await render(post);
+
+// Get related posts: prefer posts with overlapping tags, exclude current post
+const currentTags = new Set(post.data.tags);
+const relatedPosts = allPosts
+	.filter((p) => p.id !== post.id)
+	.map((p) => ({
+		...p,
+		overlap: p.data.tags.filter((t) => currentTags.has(t)).length,
+	}))
+	.sort((a, b) => b.overlap - a.overlap || new Date(b.data.publishedDate).valueOf() - new Date(a.data.publishedDate).valueOf())
+	.slice(0, 3);
 ---
 
 <BlogPost
@@ -23,6 +34,7 @@ const { Content } = await render(post);
 	tags={post.data.tags}
 	keywords={post.data.keywords}
 	ogImage={post.data.ogImage}
+	relatedPosts={relatedPosts}
 >
 	<Content />
 </BlogPost>

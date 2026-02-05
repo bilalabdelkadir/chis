@@ -26,7 +26,9 @@ const {
 } = Astro.props;
 
 const resolvedCanonical = canonicalURL || Astro.url.href;
-const resolvedOgImage = ogImage || new URL('/og-default.png', Astro.site).href;
+const resolvedOgImage = ogImage
+	? new URL(ogImage, Astro.site).href
+	: new URL('/logo.png', Astro.site).href;
 
 const structuredData = ogType === 'website' ? {
 	"@context": "https://schema.org",
@@ -57,6 +59,7 @@ const structuredData = ogType === 'website' ? {
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<link rel="icon" type="image/png" href="/fav.png" />
 		<meta name="description" content={description} />
+		<meta name="robots" content="index, follow" />
 		<meta name="generator" content={Astro.generator} />
 
 		<!-- Canonical -->
