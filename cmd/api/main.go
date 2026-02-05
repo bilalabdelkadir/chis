@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"github.com/bilalabdelkadir/chis/internal/handler"
 	"github.com/bilalabdelkadir/chis/internal/logger"
 	"github.com/bilalabdelkadir/chis/internal/middleware"
+	"github.com/bilalabdelkadir/chis/internal/queue"
 	"github.com/bilalabdelkadir/chis/internal/repository"
 	"github.com/bilalabdelkadir/chis/internal/router"
 	pb "github.com/bilalabdelkadir/chis/proto/delivery"
@@ -48,6 +50,13 @@ func main() {
 	defer pool.Close()
 
 	slog.Info("database connected.")
+
+	rdb, err := queue.NewRedisClient(context.Background(), cfg.RedisUrl)
+	if err != nil {
+		slog.Error("failed to connect to redis", "error", err)
+		os.Exit(1)
+	}
+	defer rdb.Close()
 
 	// Repositories
 	userRepo := repository.NewUserRepository(pool)
@@ -86,6 +95,7 @@ func main() {
 	r := router.NewRouter()
 	r.Use(middleware.CORS(cfg.Env, cfg.Origin))
 	r.Use(middleware.Logging)
+	r.Use(middleware.RateLimit(rdb))
 	r.Get("/health", healthHandler)
 	go func() {
 		mux := http.NewServeMux()
